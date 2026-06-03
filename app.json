@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "recall-ar",
-    "slug": "recall-ar",
+    "slug": "recallar-v2",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -39,6 +39,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "9e72c28d-a0b1-4154-9458-4d40509b82bc"
+      }
+    },
+    "owner": "jwtan05"
   }
 }
