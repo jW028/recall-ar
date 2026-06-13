@@ -1,12 +1,23 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import React from 'react';
-import { useColorScheme } from 'react-native';
+import { DatabaseProvider } from '@/database/local/db';
+import { AuthService } from '@/services/AuthService';
+import { useAuthStore } from '@/store/AuthStore';
+import { Stack } from 'expo-router';
+import { useEffect } from 'react';
 
+export default function RootLayout() {
+  const { setUser, isLoading, isAuthenticated, isCaregiver } = useAuthStore();
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  useEffect(() => {
+    // Subscribe to auth state
+    const unsubscribe = AuthService.onAuthStateChange(setUser);
+    return unsubscribe;
+  }, []);
+
+  if (isLoading) return null; // Show splash screen
+
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-    </ThemeProvider>
+    <DatabaseProvider>
+      <Stack screenOptions={{ headerShown: false}} />
+    </DatabaseProvider>
   );
 }
