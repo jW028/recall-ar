@@ -2,7 +2,7 @@
 
 import { SQLiteProvider, useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
 import { Suspense, type ReactNode } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { CREATE_TABLES } from './schema';
 
 const DATABASE_NAME = 'recallar.db';
@@ -57,13 +57,12 @@ async function runMigrations(db: SQLiteDatabase): Promise<void> {
 // DB initialization UI
 function DatabaseLoadingFallback() {
     return (
-        <View style={styles.fallback}>
-            <ActivityIndicator size="large" />
-            <Text style={styles.fallbackText}>Loading...</Text>
-        </View>
+      <View style={styles.fallback}>
+        <ActivityIndicator size="large" />
+        <Text style={styles.fallbackText}>Loading...</Text>
+      </View>
     );
-}
-
+  }
 // DatabaseProvider
 interface DatabaseProviderProps {
     children: ReactNode;
@@ -76,7 +75,7 @@ export function DatabaseProvider({ children }: DatabaseProviderProps) {
                 databaseName={DATABASE_NAME}
                 onInit={runMigrations}
                 useSuspense
-        >
+            >
             {children}
             </SQLiteProvider>
         </Suspense>
