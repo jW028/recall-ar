@@ -1,30 +1,29 @@
-
 import { Link } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-export default function Index() {
+export default function MainScreen() {
 	return (
 		<View style={styles.container}>
-			<View style={styles.hero}>
+			<View style={styles.card}>
 				<Text style={styles.kicker}>RecallAR</Text>
-				<Text style={styles.title}>Care support made simple.</Text>
+				<Text style={styles.title}>Welcome</Text>
 				<Text style={styles.subtitle}>
-					Log in to continue or create a caregiver account to get started.
+					Sign in to continue or create a caregiver account.
 				</Text>
-			</View>
 
-			<View style={styles.actions}>
-				<Link href="/login" asChild>
-					<Pressable style={styles.primaryButton}>
-						<Text style={styles.primaryButtonText}>Login</Text>
-					</Pressable>
-				</Link>
+				<View style={styles.actions}>
+					<Link href="/login" asChild>
+						<Pressable style={styles.primaryButton}>
+							<Text style={styles.primaryButtonText}>Login</Text>
+						</Pressable>
+					</Link>
 
-				<Link href="/register" asChild>
-					<Pressable style={styles.secondaryButton}>
-						<Text style={styles.secondaryButtonText}>Sign up</Text>
-					</Pressable>
-				</Link>
+					<Link href="/register" asChild>
+						<Pressable style={styles.secondaryButton}>
+							<Text style={styles.secondaryButtonText}>Sign up</Text>
+						</Pressable>
+					</Link>
+				</View>
 			</View>
 		</View>
 	);
@@ -34,13 +33,19 @@ const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 		backgroundColor: '#F3F7FC',
-		paddingHorizontal: 24,
-		paddingVertical: 48,
+		padding: 24,
 		justifyContent: 'center',
 	},
-	hero: {
+	card: {
+		backgroundColor: '#FFFFFF',
+		borderRadius: 24,
+		padding: 24,
 		gap: 12,
-		marginBottom: 32,
+		shadowColor: '#0F172A',
+		shadowOpacity: 0.08,
+		shadowRadius: 24,
+		shadowOffset: { width: 0, height: 12 },
+		elevation: 3,
 	},
 	kicker: {
 		fontSize: 14,
@@ -50,8 +55,8 @@ const styles = StyleSheet.create({
 		color: '#2563EB',
 	},
 	title: {
-		fontSize: 36,
-		lineHeight: 42,
+		fontSize: 34,
+		lineHeight: 40,
 		fontWeight: '800',
 		color: '#0F172A',
 	},
@@ -59,10 +64,11 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		lineHeight: 24,
 		color: '#475569',
-		maxWidth: 360,
+		marginBottom: 8,
 	},
 	actions: {
 		gap: 12,
+		marginTop: 8,
 	},
 	primaryButton: {
 		backgroundColor: '#2563EB',

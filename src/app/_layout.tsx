@@ -1,6 +1,6 @@
 import { DatabaseProvider } from '@/database/local/db';
 import { AuthService } from '@/services/AuthService';
-import { useAuthStore } from '@/store/AuthStore';
+import { useAuthStore } from '@/store/authStore';
 import { Stack } from 'expo-router';
 import { useEffect } from 'react';
 
