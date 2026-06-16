@@ -1,22 +1,78 @@
 import { DatabaseProvider } from '@/database/local/db';
 import { AuthService } from '@/services/AuthService';
+import { PairingService } from '@/services/PairingService';
 import { useAuthStore } from '@/store/authStore';
-import { Stack } from 'expo-router';
-import { useEffect } from 'react';
+import { Stack, useRouter, useSegments } from 'expo-router';
+import { useEffect, useState } from 'react';
 
-export default function RootLayout() {
-  const { setUser, isLoading, isAuthenticated, isCaregiver } = useAuthStore();
+function AuthGuard() {
+  const router = useRouter();
+  const segments = useSegments();
+  const { user, status, setUser } = useAuthStore();
 
+  const [pairingChecked, setPairingChecked] = useState(false);
+
+  // Check for persisted patient pairing
   useEffect(() => {
-    // Subscribe to auth state
-    const unsubscribe = AuthService.onAuthStateChange(setUser);
+    PairingService.getPersistedPairing().then(async (pairingInfo) => {
+      if (pairingInfo) {
+        const currentUser = await AuthService.getCurrentUser();
+        if (currentUser) {
+          setUser(currentUser);
+        }
+      }
+      setPairingChecked(true);
+    });
+  }, []);
+
+  // Subscribe to Supabase auth state changes
+  useEffect(() => {
+    const unsubscribe = AuthService.onAuthStateChange((authUser) => {
+      setUser(authUser);
+    });
     return unsubscribe;
   }, []);
 
-  if (isLoading) return null; // Show splash screen
+  // Route based on auth status
+  useEffect(() => {
+    if (!pairingChecked || status === 'loading') return;
 
+      const inAuthGroup = segments[0] === '(auth)';
+      const inCaregiverGroup = segments[0] === '(caregiver)';
+      const inPatientGroup = segments[0] === '(patient)';
+
+      if (status === 'unauthenticated') {
+        // Not logged in and not paired - go to login
+        if (!inAuthGroup) {
+          router.replace('/(auth)/login');
+        }
+        return;
+      }
+
+      if (status === 'authenticated') {
+        if (user?.role === 'patient') {
+          // Paired patient device - always stay in patient group
+          if (!inPatientGroup) {
+            router.replace('/(patient)');
+          }
+          return;
+        }
+        if (user?.role === 'caregiver') {
+          // Authenticated caregiver - redirect away from auth screens
+          if (inAuthGroup) {
+            router.replace('/(caregiver)');
+          }
+          return;
+        }
+      }
+    }, [status, user, segments, pairingChecked]); 
+    return null;
+}
+
+export default function RootLayout() {
   return (
     <DatabaseProvider>
+      <AuthGuard />
       <Stack screenOptions={{ headerShown: false}} />
     </DatabaseProvider>
   );

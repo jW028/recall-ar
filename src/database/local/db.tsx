@@ -3,12 +3,13 @@
 import { SQLiteProvider, useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
 import { Suspense, type ReactNode } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { MIGRATION_V2_DEVICE_PAIRING } from './migrations/v2_device_pairing';
 import { CREATE_TABLES } from './schema';
 
 const DATABASE_NAME = 'recallar.db';
 
 // Bump this number when a new migration is added in the MIGRATIONS array
-const LATEST_VERSION = 1;
+const LATEST_VERSION = 2;
 
 
 interface Migration {
@@ -23,12 +24,11 @@ const MIGRATIONS: Migration[] = [
         description: 'Initial schema',
         sql: CREATE_TABLES,
     },
-    // Example of future migrations
-      // {
-    //   version: 2,
-    //   description: 'Add mastery_streak column to MemoryAsset',
-    //   sql: `ALTER TABLE MemoryAsset ADD COLUMN mastery_streak INTEGER NOT NULL DEFAULT 0;`,
-    // },
+    {
+      version: 2,
+      description: 'Add DevicePairing table',
+      sql: MIGRATION_V2_DEVICE_PAIRING,
+    },
 ]
 
 // Migration runner, called by SQLiteProvider's onInit

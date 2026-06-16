@@ -166,6 +166,54 @@ export type Database = {
           },
         ]
       }
+      DevicePairing: {
+        Row: {
+          caregiver_id: string
+          created_at: string
+          device_label: string | null
+          expires_at: string
+          pairing_id: string
+          patient_id: string
+          token: string
+          used_at: string | null
+        }
+        Insert: {
+          caregiver_id: string
+          created_at?: string
+          device_label?: string | null
+          expires_at: string
+          pairing_id?: string
+          patient_id: string
+          token: string
+          used_at?: string | null
+        }
+        Update: {
+          caregiver_id?: string
+          created_at?: string
+          device_label?: string | null
+          expires_at?: string
+          pairing_id?: string
+          patient_id?: string
+          token?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "DevicePairing_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "Caregiver"
+            referencedColumns: ["caregiver_id"]
+          },
+          {
+            foreignKeyName: "DevicePairing_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "Patient"
+            referencedColumns: ["patient_id"]
+          },
+        ]
+      }
       Geofence: {
         Row: {
           center_latitude: number
