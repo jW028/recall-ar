@@ -1,4 +1,5 @@
 import { DatabaseProvider } from '@/database/local/db';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { AuthService } from '@/services/AuthService';
 import { PairingService } from '@/services/PairingService';
 import { useAuthStore } from '@/store/authStore';
@@ -70,6 +71,7 @@ function AuthGuard() {
 }
 
 export default function RootLayout() {
+  useNetworkStatus(); // Auto-sync on reconnect
   return (
     <DatabaseProvider>
       <AuthGuard />

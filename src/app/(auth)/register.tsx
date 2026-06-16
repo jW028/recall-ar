@@ -1,6 +1,8 @@
+import type { Theme } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { useAuthViewModel } from '@/viewmodels/useAuthViewModel';
 import { Link } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
     KeyboardAvoidingView,
     Platform,
@@ -14,6 +16,8 @@ import {
 
 export default function RegisterScreen() {
   const { register, isSubmitting, error, clearError } = useAuthViewModel();
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -73,7 +77,7 @@ export default function RegisterScreen() {
             value={fullName}
             onChangeText={handleChange(setFullName)}
             placeholder="Jane Doe"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={theme.textFaint}
             autoComplete="name"
             returnKeyType="next"
           />
@@ -86,7 +90,7 @@ export default function RegisterScreen() {
             value={email}
             onChangeText={handleChange(setEmail)}
             placeholder="you@example.com"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={theme.textFaint}
             autoCapitalize="none"
             autoComplete="email"
             keyboardType="email-address"
@@ -101,7 +105,7 @@ export default function RegisterScreen() {
             value={contact}
             onChangeText={handleChange(setContact)}
             placeholder="+60 12 345 6789"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={theme.textFaint}
             keyboardType="phone-pad"
             autoComplete="tel"
             returnKeyType="next"
@@ -115,7 +119,7 @@ export default function RegisterScreen() {
             value={password}
             onChangeText={handleChange(setPassword)}
             placeholder="At least 8 characters"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={theme.textFaint}
             secureTextEntry
             autoComplete="new-password"
             returnKeyType="next"
@@ -129,7 +133,7 @@ export default function RegisterScreen() {
             value={confirmPassword}
             onChangeText={handleChange(setConfirmPassword)}
             placeholder="Re-enter your password"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={theme.textFaint}
             secureTextEntry
             autoComplete="new-password"
             returnKeyType="done"
@@ -161,96 +165,98 @@ export default function RegisterScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  container: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 48,
-    maxWidth: 480,
-    width: '100%',
-    alignSelf: 'center',
-  },
-  header: {
-    marginBottom: 32,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-  },
-  errorBox: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FCA5A5',
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-  },
-  errorText: {
-    color: '#B91C1C',
-    fontSize: 14,
-  },
-  field: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: '#111827',
-    backgroundColor: '#F9FAFB',
-  },
-  fieldError: {
-    fontSize: 13,
-    color: '#B91C1C',
-    marginTop: 6,
-  },
-  button: {
-    backgroundColor: '#2563EB',
-    borderRadius: 10,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    backgroundColor: '#93C5FD',
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 24,
-  },
-  footerText: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  link: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2563EB',
-  },
-});
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
+    flex: {
+      flex: 1,
+      backgroundColor: theme.surface,
+    },
+    container: {
+      flexGrow: 1,
+      justifyContent: 'center',
+      paddingHorizontal: 24,
+      paddingVertical: 48,
+      maxWidth: 480,
+      width: '100%',
+      alignSelf: 'center',
+    },
+    header: {
+      marginBottom: 32,
+    },
+    title: {
+      fontSize: 32,
+      fontWeight: '700',
+      color: theme.body,
+      marginBottom: 4,
+    },
+    subtitle: {
+      fontSize: 16,
+      color: theme.textMuted,
+    },
+    errorBox: {
+      backgroundColor: theme.errorBackground,
+      borderColor: theme.errorBorder,
+      borderWidth: 1,
+      borderRadius: 8,
+      padding: 12,
+      marginBottom: 16,
+    },
+    errorText: {
+      color: theme.error,
+      fontSize: 14,
+    },
+    field: {
+      marginBottom: 20,
+    },
+    label: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.label,
+      marginBottom: 8,
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: theme.borderStrong,
+      borderRadius: 10,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      fontSize: 16,
+      color: theme.body,
+      backgroundColor: theme.cardBackground,
+    },
+    fieldError: {
+      fontSize: 13,
+      color: theme.error,
+      marginTop: 6,
+    },
+    button: {
+      backgroundColor: theme.primary,
+      borderRadius: 10,
+      paddingVertical: 16,
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    buttonDisabled: {
+      backgroundColor: theme.primaryDisabled,
+    },
+    buttonText: {
+      color: theme.onPrimary,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    footer: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      marginTop: 24,
+    },
+    footerText: {
+      fontSize: 14,
+      color: theme.textMuted,
+    },
+    link: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.primary,
+    },
+  });
+}

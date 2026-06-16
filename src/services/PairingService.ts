@@ -1,5 +1,5 @@
-import { getDatabase } from "@/database/local/db";
-import { supabase } from "@/database/remote/supabaseClient";
+import { getDatabase } from '@/database/local/db';
+import { supabase } from '@/database/remote/supabaseClient';
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 
@@ -174,7 +174,7 @@ async function unpairDevice(): Promise<void> {
         const db = getDatabase();
         await db.runAsync('DELETE FROM DevicePairing');
     } catch (e) {
-        console.warn('[PairingService] SQLite unapir failed:', e);
+        console.warn('[PairingService] SQLite unpair failed:', e);
     }
 }
 

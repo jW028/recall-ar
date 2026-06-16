@@ -1,7 +1,7 @@
 // expo-sqlite provider & migration runner
 
 import { SQLiteProvider, useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
-import { Suspense, type ReactNode } from 'react';
+import { Suspense, useEffect, type ReactNode } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { MIGRATION_V2_DEVICE_PAIRING } from './migrations/v2_device_pairing';
 import { CREATE_TABLES } from './schema';
@@ -68,6 +68,20 @@ interface DatabaseProviderProps {
     children: ReactNode;
 }
 
+// Bridges the SQLite context into the module-level `_db` ref so that
+// non-component code (services) can call getDatabase() outside of React.
+// Rendered as a child of SQLiteProvider, so useSQLiteContext() is only
+// reached once the database has finished initializing (post-Suspense).
+function DatabaseRefBridge({ children }: { children: ReactNode }) {
+    const db = useSQLiteContext();
+
+    useEffect(() => {
+        initDatabaseRef(db);
+    }, [db]);
+
+    return children;
+}
+
 export function DatabaseProvider({ children }: DatabaseProviderProps) {
     return (
         <Suspense fallback={<DatabaseLoadingFallback />}>
@@ -76,7 +90,7 @@ export function DatabaseProvider({ children }: DatabaseProviderProps) {
                 onInit={runMigrations}
                 useSuspense
             >
-            {children}
+                <DatabaseRefBridge>{children}</DatabaseRefBridge>
             </SQLiteProvider>
         </Suspense>
     );
@@ -97,6 +111,12 @@ export function getDatabase(): SQLiteDatabase {
         );
     }
     return _db;
+}
+
+// Lets callers outside of React (e.g. services triggered by event listeners)
+// check readiness before calling getDatabase(), instead of relying on a try/catch.
+export function isDatabaseReady(): boolean {
+    return _db !== null;
 }
 
 const styles = StyleSheet.create({

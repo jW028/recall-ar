@@ -1,8 +1,14 @@
 
+import type { Theme } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { Link } from 'expo-router';
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 export default function Index() {
+	const theme = useTheme();
+	const styles = useMemo(() => createStyles(theme), [theme]);
+
 	return (
 		<View style={styles.container}>
 			<View style={styles.hero}>
@@ -30,60 +36,62 @@ export default function Index() {
 	);
 }
 
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: '#F3F7FC',
-		paddingHorizontal: 24,
-		paddingVertical: 48,
-		justifyContent: 'center',
-	},
-	hero: {
-		gap: 12,
-		marginBottom: 32,
-	},
-	kicker: {
-		fontSize: 14,
-		fontWeight: '700',
-		letterSpacing: 1.2,
-		textTransform: 'uppercase',
-		color: '#2563EB',
-	},
-	title: {
-		fontSize: 36,
-		lineHeight: 42,
-		fontWeight: '800',
-		color: '#0F172A',
-	},
-	subtitle: {
-		fontSize: 16,
-		lineHeight: 24,
-		color: '#475569',
-		maxWidth: 360,
-	},
-	actions: {
-		gap: 12,
-	},
-	primaryButton: {
-		backgroundColor: '#2563EB',
-		borderRadius: 14,
-		paddingVertical: 16,
-		alignItems: 'center',
-	},
-	primaryButtonText: {
-		color: '#FFFFFF',
-		fontSize: 16,
-		fontWeight: '700',
-	},
-	secondaryButton: {
-		backgroundColor: '#E2E8F0',
-		borderRadius: 14,
-		paddingVertical: 16,
-		alignItems: 'center',
-	},
-	secondaryButtonText: {
-		color: '#0F172A',
-		fontSize: 16,
-		fontWeight: '700',
-	},
-});
+function createStyles(theme: Theme) {
+	return StyleSheet.create({
+		container: {
+			flex: 1,
+			backgroundColor: theme.pageBackground,
+			paddingHorizontal: 24,
+			paddingVertical: 48,
+			justifyContent: 'center',
+		},
+		hero: {
+			gap: 12,
+			marginBottom: 32,
+		},
+		kicker: {
+			fontSize: 14,
+			fontWeight: '700',
+			letterSpacing: 1.2,
+			textTransform: 'uppercase',
+			color: theme.primary,
+		},
+		title: {
+			fontSize: 36,
+			lineHeight: 42,
+			fontWeight: '800',
+			color: theme.heading,
+		},
+		subtitle: {
+			fontSize: 16,
+			lineHeight: 24,
+			color: theme.bodySecondary,
+			maxWidth: 360,
+		},
+		actions: {
+			gap: 12,
+		},
+		primaryButton: {
+			backgroundColor: theme.primary,
+			borderRadius: 14,
+			paddingVertical: 16,
+			alignItems: 'center',
+		},
+		primaryButtonText: {
+			color: theme.onPrimary,
+			fontSize: 16,
+			fontWeight: '700',
+		},
+		secondaryButton: {
+			backgroundColor: theme.buttonSecondaryBackground,
+			borderRadius: 14,
+			paddingVertical: 16,
+			alignItems: 'center',
+		},
+		secondaryButtonText: {
+			color: theme.heading,
+			fontSize: 16,
+			fontWeight: '700',
+		},
+	});
+}

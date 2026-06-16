@@ -1,7 +1,13 @@
+import type { Theme } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { Link } from 'expo-router';
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 export default function MainScreen() {
+	const theme = useTheme();
+	const styles = useMemo(() => createStyles(theme), [theme]);
+
 	return (
 		<View style={styles.container}>
 			<View style={styles.card}>
@@ -29,67 +35,69 @@ export default function MainScreen() {
 	);
 }
 
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: '#F3F7FC',
-		padding: 24,
-		justifyContent: 'center',
-	},
-	card: {
-		backgroundColor: '#FFFFFF',
-		borderRadius: 24,
-		padding: 24,
-		gap: 12,
-		shadowColor: '#0F172A',
-		shadowOpacity: 0.08,
-		shadowRadius: 24,
-		shadowOffset: { width: 0, height: 12 },
-		elevation: 3,
-	},
-	kicker: {
-		fontSize: 14,
-		fontWeight: '700',
-		letterSpacing: 1.2,
-		textTransform: 'uppercase',
-		color: '#2563EB',
-	},
-	title: {
-		fontSize: 34,
-		lineHeight: 40,
-		fontWeight: '800',
-		color: '#0F172A',
-	},
-	subtitle: {
-		fontSize: 16,
-		lineHeight: 24,
-		color: '#475569',
-		marginBottom: 8,
-	},
-	actions: {
-		gap: 12,
-		marginTop: 8,
-	},
-	primaryButton: {
-		backgroundColor: '#2563EB',
-		borderRadius: 14,
-		paddingVertical: 16,
-		alignItems: 'center',
-	},
-	primaryButtonText: {
-		color: '#FFFFFF',
-		fontSize: 16,
-		fontWeight: '700',
-	},
-	secondaryButton: {
-		backgroundColor: '#E2E8F0',
-		borderRadius: 14,
-		paddingVertical: 16,
-		alignItems: 'center',
-	},
-	secondaryButtonText: {
-		color: '#0F172A',
-		fontSize: 16,
-		fontWeight: '700',
-	},
-});
+function createStyles(theme: Theme) {
+	return StyleSheet.create({
+		container: {
+			flex: 1,
+			backgroundColor: theme.pageBackground,
+			padding: 24,
+			justifyContent: 'center',
+		},
+		card: {
+			backgroundColor: theme.surface,
+			borderRadius: 24,
+			padding: 24,
+			gap: 12,
+			shadowColor: theme.heading,
+			shadowOpacity: 0.08,
+			shadowRadius: 24,
+			shadowOffset: { width: 0, height: 12 },
+			elevation: 3,
+		},
+		kicker: {
+			fontSize: 14,
+			fontWeight: '700',
+			letterSpacing: 1.2,
+			textTransform: 'uppercase',
+			color: theme.primary,
+		},
+		title: {
+			fontSize: 34,
+			lineHeight: 40,
+			fontWeight: '800',
+			color: theme.heading,
+		},
+		subtitle: {
+			fontSize: 16,
+			lineHeight: 24,
+			color: theme.bodySecondary,
+			marginBottom: 8,
+		},
+		actions: {
+			gap: 12,
+			marginTop: 8,
+		},
+		primaryButton: {
+			backgroundColor: theme.primary,
+			borderRadius: 14,
+			paddingVertical: 16,
+			alignItems: 'center',
+		},
+		primaryButtonText: {
+			color: theme.onPrimary,
+			fontSize: 16,
+			fontWeight: '700',
+		},
+		secondaryButton: {
+			backgroundColor: theme.buttonSecondaryBackground,
+			borderRadius: 14,
+			paddingVertical: 16,
+			alignItems: 'center',
+		},
+		secondaryButtonText: {
+			color: theme.heading,
+			fontSize: 16,
+			fontWeight: '700',
+		},
+	});
+}

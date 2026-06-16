@@ -1,7 +1,8 @@
-import { AuthService, SignInParams, SignUpParams } from "@/services/AuthService";
-import { useAuthStore } from "@/store/authStore";
-import { useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { AuthService } from '@/services/AuthService';
+import type { SignInParams, SignUpParams } from '@/services/AuthService';
+import { useAuthStore } from '@/store/authStore';
+import { useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 
 interface UseAuthViewModel {
     // State

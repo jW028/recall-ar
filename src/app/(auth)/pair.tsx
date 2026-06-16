@@ -1,7 +1,9 @@
+import type { Theme } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { PairingService } from '@/services/PairingService';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Pressable,
@@ -14,6 +16,8 @@ type ScanState = 'scanning' | 'processing' | 'error';
  
 export default function PairDeviceScreen() {
   const router = useRouter();
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [permission, requestPermission] = useCameraPermissions();
   const [scanState, setScanState] = useState<ScanState>('scanning');
   const [error, setError] = useState<string | null>(null);
@@ -97,7 +101,7 @@ export default function PairDeviceScreen() {
         {/* Processing overlay */}
         {scanState === 'processing' && (
           <View style={styles.overlay}>
-            <ActivityIndicator size="large" color="#FFFFFF" />
+            <ActivityIndicator size="large" color={theme.onPrimary} />
             <Text style={styles.overlayText}>Setting up…</Text>
           </View>
         )}
@@ -117,118 +121,125 @@ export default function PairDeviceScreen() {
  
 const CORNER_SIZE = 24;
 const CORNER_THICKNESS = 4;
-const CORNER_COLOR = '#2563EB';
- 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-    paddingVertical: 48,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  body: {
-    fontSize: 16,
-    color: '#4B5563',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 32,
-  },
-  bold: {
-    fontWeight: '700',
-    color: '#111827',
-  },
-  scannerWrapper: {
-    width: '100%',
-    aspectRatio: 1,
-    maxWidth: 320,
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: '#000000',
-    marginBottom: 24,
-    position: 'relative',
-  },
-  corner: {
-    position: 'absolute',
-    width: CORNER_SIZE,
-    height: CORNER_SIZE,
-    borderColor: CORNER_COLOR,
-  },
-  topLeft: {
-    top: 16,
-    left: 16,
-    borderTopWidth: CORNER_THICKNESS,
-    borderLeftWidth: CORNER_THICKNESS,
-  },
-  topRight: {
-    top: 16,
-    right: 16,
-    borderTopWidth: CORNER_THICKNESS,
-    borderRightWidth: CORNER_THICKNESS,
-  },
-  bottomLeft: {
-    bottom: 16,
-    left: 16,
-    borderBottomWidth: CORNER_THICKNESS,
-    borderLeftWidth: CORNER_THICKNESS,
-  },
-  bottomRight: {
-    bottom: 16,
-    right: 16,
-    borderBottomWidth: CORNER_THICKNESS,
-    borderRightWidth: CORNER_THICKNESS,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
-  },
-  overlayText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  errorBox: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FCA5A5',
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-    width: '100%',
-  },
-  errorText: {
-    color: '#B91C1C',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  hint: {
-    fontSize: 14,
-    color: '#9CA3AF',
-    textAlign: 'center',
-  },
-  button: {
-    backgroundColor: '#2563EB',
-    borderRadius: 10,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    marginTop: 24,
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
+
+function createStyles(theme: Theme) {
+  // CORNER_COLOR sits alongside the non-color layout constants above but must be
+  // computed from the theme, so it lives here instead of at module scope.
+  const CORNER_COLOR = theme.primary;
+
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.surface,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 32,
+      paddingVertical: 48,
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: '700',
+      color: theme.body,
+      marginBottom: 12,
+      textAlign: 'center',
+    },
+    body: {
+      fontSize: 16,
+      color: theme.textMuted,
+      textAlign: 'center',
+      lineHeight: 24,
+      marginBottom: 32,
+    },
+    bold: {
+      fontWeight: '700',
+      color: theme.body,
+    },
+    scannerWrapper: {
+      width: '100%',
+      aspectRatio: 1,
+      maxWidth: 320,
+      borderRadius: 16,
+      overflow: 'hidden',
+      // Intentionally theme-invariant: this is the camera viewfinder's fallback
+      // background before the feed paints, and should stay black in light mode too.
+      backgroundColor: theme.scrim,
+      marginBottom: 24,
+      position: 'relative',
+    },
+    corner: {
+      position: 'absolute',
+      width: CORNER_SIZE,
+      height: CORNER_SIZE,
+      borderColor: CORNER_COLOR,
+    },
+    topLeft: {
+      top: 16,
+      left: 16,
+      borderTopWidth: CORNER_THICKNESS,
+      borderLeftWidth: CORNER_THICKNESS,
+    },
+    topRight: {
+      top: 16,
+      right: 16,
+      borderTopWidth: CORNER_THICKNESS,
+      borderRightWidth: CORNER_THICKNESS,
+    },
+    bottomLeft: {
+      bottom: 16,
+      left: 16,
+      borderBottomWidth: CORNER_THICKNESS,
+      borderLeftWidth: CORNER_THICKNESS,
+    },
+    bottomRight: {
+      bottom: 16,
+      right: 16,
+      borderBottomWidth: CORNER_THICKNESS,
+      borderRightWidth: CORNER_THICKNESS,
+    },
+    overlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: theme.overlay,
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: 12,
+    },
+    overlayText: {
+      color: theme.onPrimary,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    errorBox: {
+      backgroundColor: theme.errorBackground,
+      borderColor: theme.errorBorder,
+      borderWidth: 1,
+      borderRadius: 8,
+      padding: 12,
+      marginBottom: 16,
+      width: '100%',
+    },
+    errorText: {
+      color: theme.error,
+      fontSize: 14,
+      textAlign: 'center',
+    },
+    hint: {
+      fontSize: 14,
+      color: theme.textFaint,
+      textAlign: 'center',
+    },
+    button: {
+      backgroundColor: theme.primary,
+      borderRadius: 10,
+      paddingVertical: 16,
+      paddingHorizontal: 24,
+      alignItems: 'center',
+      marginTop: 24,
+    },
+    buttonText: {
+      color: theme.onPrimary,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+  });
+}
  
