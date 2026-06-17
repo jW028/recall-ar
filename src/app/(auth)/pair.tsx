@@ -9,6 +9,7 @@ import {
     Pressable,
     StyleSheet,
     Text,
+    TextInput,
     View,
 } from 'react-native';
  
@@ -24,6 +25,7 @@ export default function PairDeviceScreen() {
  
   // Prevent processing multiple scans in quick succession
   const [hasScanned, setHasScanned] = useState(false);
+  const [devToken, setDevToken] = useState('');
  
   useEffect(() => {
     // If the device is already paired, skip straight to the patient app
@@ -75,6 +77,10 @@ export default function PairDeviceScreen() {
  
   return (
     <View style={styles.container}>
+      <Pressable style={styles.backButton} onPress={() => router.back()}>
+        <Text style={styles.backButtonText}>‹ Back</Text>
+      </Pressable>
+
       <Text style={styles.title}>Set up this device</Text>
       <Text style={styles.body}>
         Ask the caregiver to open RecallAR on their phone, go to{' '}
@@ -115,6 +121,30 @@ export default function PairDeviceScreen() {
       )}
  
       <Text style={styles.hint}>This step only needs to be done once.</Text>
+
+      {__DEV__ && (
+        <View style={styles.devSection}>
+          <Text style={styles.devLabel}>⚙ DEV: Paste token manually</Text>
+          <TextInput
+            style={styles.devInput}
+            value={devToken}
+            onChangeText={setDevToken}
+            placeholder="Paste token here"
+            placeholderTextColor="#999"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <Pressable
+            style={styles.devButton}
+            onPress={() => {
+              if (devToken.trim()) handleBarCodeScanned({ data: devToken.trim() });
+            }}
+            disabled={scanState === 'processing' || !devToken.trim()}
+          >
+            <Text style={styles.devButtonText}>Submit token</Text>
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 }
@@ -136,6 +166,8 @@ function createStyles(theme: Theme) {
       paddingHorizontal: 32,
       paddingVertical: 48,
     },
+    backButton: { position: 'absolute', top: 56, left: 32 },
+    backButtonText: { fontSize: 16, color: theme.primary, fontWeight: '600' },
     title: {
       fontSize: 28,
       fontWeight: '700',
@@ -226,6 +258,41 @@ function createStyles(theme: Theme) {
       fontSize: 14,
       color: theme.textFaint,
       textAlign: 'center',
+    },
+    devSection: {
+      width: '100%',
+      marginTop: 32,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: theme.borderStrong,
+      borderRadius: 8,
+      gap: 8,
+    },
+    devLabel: {
+      fontSize: 12,
+      color: theme.textMuted,
+      marginBottom: 4,
+    },
+    devInput: {
+      borderWidth: 1,
+      borderColor: theme.borderStrong,
+      borderRadius: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 13,
+      color: theme.body,
+      backgroundColor: theme.cardBackground,
+    },
+    devButton: {
+      backgroundColor: theme.primaryMuted,
+      borderRadius: 6,
+      paddingVertical: 10,
+      alignItems: 'center',
+    },
+    devButtonText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: theme.primaryText,
     },
     button: {
       backgroundColor: theme.primary,

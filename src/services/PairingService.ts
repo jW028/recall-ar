@@ -2,6 +2,7 @@ import { getDatabase } from '@/database/local/db';
 import { supabase } from '@/database/remote/supabaseClient';
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
+import { SyncService } from './SyncService';
 
 
 // Constants
@@ -44,6 +45,10 @@ async function generatePairingToken(
         return { data: null, error: 'Not authenticated.' };
     }
 
+    // Flush pending sync entries so the Patient row exists in Supabase
+    // before inserting the DevicePairing FK that references it.
+    await SyncService.drainQueue();
+
     const randomBytes = await Crypto.getRandomBytesAsync(32);
     const token = Array.from(randomBytes)
         .map((b) => b.toString(16).padStart(2, '0'))
@@ -63,7 +68,7 @@ async function generatePairingToken(
     if (error) {
         return {
             data: null,
-            error: 'Failed to generate pairing token. Please try again.',
+            error: 'Failed to generate pairing code. Make sure you\'re connected to the internet and try again.',
         };
     }
 
@@ -79,7 +84,10 @@ async function pairDevice(token: string): Promise<PairingResult> {
     try {
         response = await fetch(EDGE_FUNCTION_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY}`,
+            },
             body: JSON.stringify({ token }),
         });
     } catch {

@@ -4,7 +4,7 @@ import { useDevicePairingViewModel } from '@/viewmodels/useDevicePairingViewMode
 import { usePatientDetailViewModel } from '@/viewmodels/usePatientViewModel';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Clipboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
 function formatCountdown(seconds: number): string {
@@ -77,6 +77,15 @@ export default function PairDeviceScreen() {
                 : `Expires in ${formatCountdown(secondsRemaining)}`}
             </Text>
         </View>
+        )}
+
+        {__DEV__ && pairingToken && (
+        <Pressable
+            style={styles.devCopyButton}
+            onPress={() => Clipboard.setString(pairingToken.token)}
+        >
+            <Text style={styles.devCopyText}>⚙ DEV: Copy token</Text>
+        </Pressable>
         )}
 
         <Pressable
@@ -187,6 +196,19 @@ function createStyles(theme: Theme) {
     color: theme.textFaint,
     textAlign: 'center',
     paddingHorizontal: 16,
+    },
+    devCopyButton: {
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: theme.borderStrong,
+    },
+    devCopyText: {
+    fontSize: 12,
+    color: theme.textMuted,
+    textAlign: 'center',
     },
     });
 }

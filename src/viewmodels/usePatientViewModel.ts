@@ -52,22 +52,28 @@ caregiverId: string | undefined
         setIsCreating(true);
         setCreateError(null);
 
-        const result = await PatientService.createPatient(params);
+        try {
+            const result = await PatientService.createPatient(params);
 
-        if (result.error || !result.data) {
-            setCreateError(result.error ?? 'Failed to create patient.');
+            if (result.error || !result.data) {
+                setCreateError(result.error ?? 'Failed to create patient.');
+                setIsCreating(false);
+                return false;
+            }
+
+            // Optimistically insert into local list — no need to refetch
+            setPatients((prev) =>
+                [...prev, result.data!].sort((a, b) =>
+                a.patientName.localeCompare(b.patientName)
+                )
+            );
+            setIsCreating(false);
+            return true;
+        } catch {
+            setCreateError('Failed to create patient. Please try again.');
             setIsCreating(false);
             return false;
         }
-
-        // Optimistically insert into local list — no need to refetch
-        setPatients((prev) =>
-            [...prev, result.data!].sort((a, b) =>
-            a.patientName.localeCompare(b.patientName)
-            )
-        );
-        setIsCreating(false);
-        return true;
         },
         []
     );
