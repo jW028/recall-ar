@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 
 export default function RegisterScreen() {
-  const { register, isSubmitting, error, clearError } = useAuthViewModel();
+  const { register, isSubmitting, error, clearError, confirmationPending } = useAuthViewModel();
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -63,6 +63,14 @@ export default function RegisterScreen() {
           <Text style={styles.title}>Create account</Text>
           <Text style={styles.subtitle}>For caregivers managing patient profiles</Text>
         </View>
+
+        {confirmationPending && (
+          <View style={styles.confirmBox}>
+            <Text style={styles.confirmText}>
+              Account created! Check your email and click the confirmation link to activate your account.
+            </Text>
+          </View>
+        )}
 
         {error && (
           <View style={styles.errorBox}>
@@ -192,6 +200,19 @@ function createStyles(theme: Theme) {
     subtitle: {
       fontSize: 16,
       color: theme.textMuted,
+    },
+    confirmBox: {
+      backgroundColor: theme.primaryMuted,
+      borderColor: theme.primaryMutedBorder,
+      borderWidth: 1,
+      borderRadius: 8,
+      padding: 12,
+      marginBottom: 16,
+    },
+    confirmText: {
+      color: theme.primaryText,
+      fontSize: 14,
+      lineHeight: 20,
     },
     errorBox: {
       backgroundColor: theme.errorBackground,

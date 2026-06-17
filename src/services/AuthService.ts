@@ -31,7 +31,9 @@ export interface AuthResult<T = void> {
 
 // Helper functions
 
-// Map raw Supabase User + Caregiver row into a typed AuthUser
+// Map raw Supabase User + Caregiver row into a typed AuthUser.
+// The Caregiver row is created by the on_auth_user_created database trigger
+// (SECURITY DEFINER), so it exists by the time the user first signs in.
 async function resolveAuthUser(user: User): Promise<AuthUser | null> {
     const role = (user.user_metadata?.role as UserRole) ?? 'caregiver';
 
@@ -41,6 +43,7 @@ async function resolveAuthUser(user: User): Promise<AuthUser | null> {
             .select('full_name')
             .eq('caregiver_id', user.id)
             .single();
+
         if (error || !data) return null;
 
         return {
@@ -51,9 +54,9 @@ async function resolveAuthUser(user: User): Promise<AuthUser | null> {
         };
     }
 
-    // Patient role
+    // Patient role — use patient_id from metadata so AuthUser.id === patient_id
     return {
-        id: user.id,
+        id: user.user_metadata?.patient_id ?? user.id,
         email: user.email ?? '',
         role: 'patient',
         fullName: user.user_metadata?.full_name ?? '',
@@ -89,18 +92,23 @@ async function signIn(
     return { data: authUser, error: null };
 }
 
-// Caregiver sign up
+// Caregiver sign up.
+// When email confirmation is enabled in Supabase, signUp returns session: null
+// and there is no active session with which to run an authenticated insert.
+// In that case we skip the profile insert here and let resolveAuthUser handle
+// it on the first sign-in after the user confirms their email.
 async function signUp(
     params: SignUpParams
 ): Promise<AuthResult<AuthUser>> {
-    // Create Supabase auth user
     const { data, error } = await supabase.auth.signUp({
         email: params.email.trim().toLowerCase(),
         password: params.password,
         options: {
             data: {
                 role: params.role,
-                full_name: params.fullName
+                full_name: params.fullName,
+                // Store contact so resolveAuthUser can create the profile later
+                contact: params.contact,
             },
         },
     });
@@ -112,7 +120,13 @@ async function signUp(
         };
     }
 
-    // Insert Caregiver profile row (caregiver_id matches Supabase auth user id)
+    // Email confirmation pending — no session yet, skip the profile insert.
+    // resolveAuthUser will create the Caregiver row on first sign-in.
+    if (!data.session) {
+        return { data: null, error: null };
+    }
+
+    // Email confirmation disabled — we have a live session, insert now.
     const { error: insertError } = await supabase.from('Caregiver').insert({
         caregiver_id: data.user.id,
         full_name: params.fullName,
@@ -121,7 +135,6 @@ async function signUp(
     });
 
     if (insertError) {
-        // Auth user created but profile insert failed -> clean up auth user
         await supabase.auth.signOut();
         return {
             data: null,
@@ -129,14 +142,15 @@ async function signUp(
         };
     }
 
-    const authUser: AuthUser = {
-        id: data.user.id,
-        email: data.user.email ?? '',
-        role: 'caregiver',
-        fullName: params.fullName,
+    return {
+        data: {
+            id: data.user.id,
+            email: data.user.email ?? '',
+            role: 'caregiver',
+            fullName: params.fullName,
+        },
+        error: null,
     };
-
-    return { data: authUser, error: null };
 }
 
 // Sign out current user and clear session

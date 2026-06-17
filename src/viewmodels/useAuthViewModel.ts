@@ -8,6 +8,7 @@ interface UseAuthViewModel {
     // State
     isSubmitting: boolean;
     error: string | null;
+    confirmationPending: boolean;
 
     // Actions
     login: (params: SignInParams) => Promise<void>;
@@ -22,6 +23,7 @@ export function useAuthViewModel(): UseAuthViewModel {
 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [confirmationPending, setConfirmationPending] = useState(false);
 
     const login = useCallback(
         async (params: SignInParams) => {
@@ -56,6 +58,14 @@ export function useAuthViewModel(): UseAuthViewModel {
                 return;
             }
 
+            if (!result.data) {
+                // Email confirmation is enabled — account created but session
+                // won't exist until the user clicks the confirmation link.
+                setConfirmationPending(true);
+                setIsSubmitting(false);
+                return;
+            }
+
             setUser(result.data);
             setIsSubmitting(false);
             router.replace('/(caregiver)');
@@ -76,6 +86,7 @@ export function useAuthViewModel(): UseAuthViewModel {
     return {
         isSubmitting,
         error,
+        confirmationPending,
         login,
         register,
         logout,
