@@ -87,6 +87,10 @@ export default function PatientDetailScreen() {
     router.push(`/(caregiver)/patients/${id}/pair-device`);
     };
 
+    const goToAssets = () => {
+    router.push(`/(caregiver)/patients/${id}/assets`);
+    };
+
     if (isLoading && !patient) {
     return (
         <View style={styles.loadingContainer}>
@@ -105,6 +109,10 @@ export default function PatientDetailScreen() {
 
     return (
     <ScrollView contentContainerStyle={styles.container}>
+        <Pressable style={styles.backButton} onPress={() => router.back()}>
+        <Text style={styles.backButtonText}>‹ Back</Text>
+        </Pressable>
+
         <View style={styles.header}>
         <Text style={styles.title}>{patient.patientName}</Text>
         {!isEditing && (
@@ -201,6 +209,10 @@ export default function PatientDetailScreen() {
         {/* ── Actions ─────────────────────── */}
         {!isEditing && (
         <>
+            <Pressable style={styles.pairButton} onPress={goToAssets}>
+            <Text style={styles.pairButtonText}>Memory assets</Text>
+            </Pressable>
+
             <Pressable style={styles.pairButton} onPress={goToPairDevice}>
             <Text style={styles.pairButtonText}>📱 Pair patient device</Text>
             </Pressable>
@@ -251,6 +263,8 @@ function createStyles(theme: Theme) {
     alignItems: 'center',
     backgroundColor: theme.surface,
     },
+    backButton: { alignSelf: 'flex-start', marginBottom: 16 },
+    backButtonText: { fontSize: 16, color: theme.primary, fontWeight: '600' },
     header: {
     flexDirection: 'row',
     justifyContent: 'space-between',

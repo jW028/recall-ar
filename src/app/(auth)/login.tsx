@@ -1,5 +1,7 @@
+import { FormField } from '@/components/common/FormField';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { validate } from '@/utils/validation';
 import { useAuthViewModel } from '@/viewmodels/useAuthViewModel';
 import { Link } from 'expo-router';
 import { useMemo, useState } from 'react';
@@ -10,7 +12,6 @@ import {
     ScrollView,
     StyleSheet,
     Text,
-    TextInput,
     View,
 } from 'react-native';
 
@@ -21,13 +22,32 @@ export default function LoginScreen() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [touched, setTouched] = useState({ email: false, password: false });
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+
+  const errors = {
+    email: validate.email(email),
+    password: validate.required(password, 'Password'),
+  };
+
+  const visibleError = (field: keyof typeof errors) =>
+    touched[field] || submitAttempted ? errors[field] : null;
+
+  const touch = (field: keyof typeof touched) => () =>
+    setTouched(prev => ({ ...prev, [field]: true }));
+
+  const handleChange = (setter: (v: string) => void) => (val: string) => {
+    setter(val);
+    if (error) clearError();
+  };
 
   const handleSubmit = () => {
-    if (!email.trim() || !password) return;
+    setSubmitAttempted(true);
+    if (errors.email || errors.password) return;
     login({ email, password });
   };
 
-  const isValid = email.trim().length > 0 && password.length > 0;
+  const isFormValid = !errors.email && !errors.password;
 
   return (
     <KeyboardAvoidingView
@@ -49,46 +69,36 @@ export default function LoginScreen() {
           </View>
         )}
 
-        <View style={styles.field}>
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={(text) => {
-              setEmail(text);
-              if (error) clearError();
-            }}
-            placeholder="you@example.com"
-            placeholderTextColor={theme.textFaint}
-            autoCapitalize="none"
-            autoComplete="email"
-            keyboardType="email-address"
-            returnKeyType="next"
-          />
-        </View>
+        <FormField
+          label="Email"
+          value={email}
+          onChangeText={handleChange(setEmail)}
+          onBlur={touch('email')}
+          error={visibleError('email')}
+          placeholder="you@example.com"
+          autoCapitalize="none"
+          autoComplete="email"
+          keyboardType="email-address"
+          returnKeyType="next"
+        />
 
-        <View style={styles.field}>
-          <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={(text) => {
-              setPassword(text);
-              if (error) clearError();
-            }}
-            placeholder="Enter your password"
-            placeholderTextColor={theme.textFaint}
-            secureTextEntry
-            autoComplete="password"
-            returnKeyType="done"
-            onSubmitEditing={handleSubmit}
-          />
-        </View>
+        <FormField
+          label="Password"
+          value={password}
+          onChangeText={handleChange(setPassword)}
+          onBlur={touch('password')}
+          error={visibleError('password')}
+          placeholder="Enter your password"
+          secureTextEntry
+          autoComplete="password"
+          returnKeyType="done"
+          onSubmitEditing={handleSubmit}
+        />
 
         <Pressable
-          style={[styles.button, !isValid && styles.buttonDisabled]}
+          style={[styles.button, !isFormValid && styles.buttonDisabled]}
           onPress={handleSubmit}
-          disabled={!isValid || isSubmitting}
+          disabled={!isFormValid || isSubmitting}
         >
           <Text style={styles.buttonText}>
             {isSubmitting ? 'Signing in…' : 'Sign in'}
@@ -129,19 +139,14 @@ function createStyles(theme: Theme) {
       width: '100%',
       alignSelf: 'center',
     },
-    header: {
-      marginBottom: 32,
-    },
+    header: { marginBottom: 32 },
     title: {
       fontSize: 32,
       fontWeight: '700',
       color: theme.body,
       marginBottom: 4,
     },
-    subtitle: {
-      fontSize: 16,
-      color: theme.textMuted,
-    },
+    subtitle: { fontSize: 16, color: theme.textMuted },
     errorBox: {
       backgroundColor: theme.errorBackground,
       borderColor: theme.errorBorder,
@@ -150,29 +155,7 @@ function createStyles(theme: Theme) {
       padding: 12,
       marginBottom: 16,
     },
-    errorText: {
-      color: theme.error,
-      fontSize: 14,
-    },
-    field: {
-      marginBottom: 20,
-    },
-    label: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: theme.label,
-      marginBottom: 8,
-    },
-    input: {
-      borderWidth: 1,
-      borderColor: theme.borderStrong,
-      borderRadius: 10,
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-      fontSize: 16,
-      color: theme.body,
-      backgroundColor: theme.cardBackground,
-    },
+    errorText: { color: theme.error, fontSize: 14 },
     button: {
       backgroundColor: theme.primary,
       borderRadius: 10,
@@ -180,28 +163,15 @@ function createStyles(theme: Theme) {
       alignItems: 'center',
       marginTop: 8,
     },
-    buttonDisabled: {
-      backgroundColor: theme.primaryDisabled,
-    },
-    buttonText: {
-      color: theme.onPrimary,
-      fontSize: 16,
-      fontWeight: '600',
-    },
+    buttonDisabled: { backgroundColor: theme.primaryDisabled },
+    buttonText: { color: theme.onPrimary, fontSize: 16, fontWeight: '600' },
     footer: {
       flexDirection: 'row',
       justifyContent: 'center',
       marginTop: 24,
     },
-    footerText: {
-      fontSize: 14,
-      color: theme.textMuted,
-    },
-    link: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: theme.primary,
-    },
+    footerText: { fontSize: 14, color: theme.textMuted },
+    link: { fontSize: 14, fontWeight: '600', color: theme.primary },
     divider: {
       height: 1,
       backgroundColor: theme.border,
