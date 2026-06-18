@@ -1,6 +1,7 @@
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Patient } from '@/models/Patient';
+import { AuthService } from '@/services/AuthService';
 import { useAuthStore } from '@/store/authStore';
 import { usePatientListViewModel } from '@/viewmodels/usePatientViewModel';
 import { useRouter } from 'expo-router';
@@ -77,6 +78,7 @@ function EmptyState({
 export default function PatientListScreen() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
+  const clearAuth = useAuthStore((state) => state.clearAuth);
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -93,6 +95,11 @@ export default function PatientListScreen() {
   const goToPatientDetail = (patientId: string) =>
     router.push(`/(caregiver)/patients/${patientId}`);
 
+  const handleSignOut = async () => {
+    await AuthService.signOut();
+    clearAuth();
+  };
+
   if (isLoading && patients.length === 0) {
     return (
       <View style={styles.loadingContainer}>
@@ -105,9 +112,14 @@ export default function PatientListScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Patients</Text>
-        <Pressable style={styles.addButton} onPress={goToNewPatient}>
-          <Text style={styles.addButtonText}>+ Add</Text>
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable style={styles.addButton} onPress={goToNewPatient}>
+            <Text style={styles.addButtonText}>+ Add</Text>
+          </Pressable>
+          <Pressable style={styles.signOutButton} onPress={handleSignOut}>
+            <Text style={styles.signOutButtonText}>Sign out</Text>
+          </Pressable>
+        </View>
       </View>
 
       {error && (
@@ -163,6 +175,11 @@ function createStyles(theme: Theme) {
       fontWeight: '700',
       color: theme.body,
     },
+    headerActions: {
+      flexDirection: 'row',
+      gap: 8,
+      alignItems: 'center',
+    },
     addButton: {
       backgroundColor: theme.primary,
       borderRadius: 8,
@@ -173,6 +190,16 @@ function createStyles(theme: Theme) {
       color: theme.onPrimary,
       fontSize: 15,
       fontWeight: '600',
+    },
+    signOutButton: {
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+    },
+    signOutButtonText: {
+      color: theme.textMuted,
+      fontSize: 15,
+      fontWeight: '500',
     },
     errorBox: {
       backgroundColor: theme.errorBackground,
