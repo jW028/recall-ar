@@ -59,9 +59,8 @@ function AuthGuard() {
           return;
         }
         if (user?.role === 'caregiver') {
-          // Authenticated caregiver - redirect away from auth screens
-          if (inAuthGroup) {
-            router.replace('/(caregiver)');
+          if (!inCaregiverGroup) {
+            router.replace('/(caregiver)/patients');
           }
           return;
         }
