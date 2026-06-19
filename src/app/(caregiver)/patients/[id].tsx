@@ -128,7 +128,7 @@ export default function PatientDetailScreen() {
         </View>
         )}
 
-        {/* ── View mode ───────────────────── */}
+        {/* View mode */}
         {!isEditing && (
         <View style={styles.detailsCard}>
             <DetailRow label="Date of birth" value={patient.dateOfBirth} styles={styles} />
@@ -145,7 +145,7 @@ export default function PatientDetailScreen() {
         </View>
         )}
 
-        {/* ── Edit mode ───────────────────── */}
+        {/* Edit mode */}
         {isEditing && (
         <View style={styles.detailsCard}>
             <View style={styles.field}>
@@ -206,7 +206,7 @@ export default function PatientDetailScreen() {
         </View>
         )}
 
-        {/* ── Actions ─────────────────────── */}
+        {/* Actions */}
         {!isEditing && (
         <>
             <Pressable style={styles.pairButton} onPress={goToAssets}>
