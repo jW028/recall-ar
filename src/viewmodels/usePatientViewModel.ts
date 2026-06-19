@@ -47,6 +47,14 @@ caregiverId: string | undefined
         refresh();
     }, [refresh]);
 
+    // Pull remote patients into the local SQLite cache when the caregiverId
+    // is first set (new device / multi-device). Errors are silently ignored
+    // so the app continues to work fully offline.
+    useEffect(() => {
+        if (!caregiverId) return;
+        PatientService.pullPatientsFromCloud(caregiverId).then(() => refresh());
+    }, [caregiverId, refresh]);
+
     const createPatient = useCallback(
         async (params: CreatePatientParams): Promise<boolean> => {
         setIsCreating(true);
