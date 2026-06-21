@@ -77,10 +77,6 @@ export default function PairDeviceScreen() {
  
   return (
     <View style={styles.container}>
-      <Pressable style={styles.backButton} onPress={() => router.back()}>
-        <Text style={styles.backButtonText}>‹ Back</Text>
-      </Pressable>
-
       <Text style={styles.title}>Set up this device</Text>
       <Text style={styles.body}>
         Ask the caregiver to open RecallAR on their phone, go to{' '}
@@ -166,8 +162,6 @@ function createStyles(theme: Theme) {
       paddingHorizontal: 32,
       paddingVertical: 48,
     },
-    backButton: { position: 'absolute', top: 56, left: 32 },
-    backButtonText: { fontSize: 16, color: theme.primary, fontWeight: '600' },
     title: {
       fontSize: 28,
       fontWeight: '700',

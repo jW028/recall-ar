@@ -45,3 +45,8 @@ app-example
 
 # supabase
 supabase/.temp/
+
+# claude
+CLAUDE.md
+.mcp.json
+CLAUDE.md

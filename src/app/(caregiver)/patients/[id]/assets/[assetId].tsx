@@ -142,7 +142,7 @@ export default function AssetDetailScreen() {
                 </View>
             )}
 
-            {/* ── View mode ───────────────────── */}
+            {/* View mode */}
             {!isEditing && (
                 <View style={styles.card}>
                     <DetailRow label="Type" value={asset.type} styles={styles} />
@@ -171,7 +171,7 @@ export default function AssetDetailScreen() {
                 </View>
             )}
 
-            {/* ── Edit mode ───────────────────── */}
+            {/* Edit mode */}
             {isEditing && (
                 <View style={styles.card}>
                     <View style={styles.field}>

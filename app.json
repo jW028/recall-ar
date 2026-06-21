@@ -8,7 +8,11 @@
     "scheme": "recallar",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "infoPlist": {
+        "NSCameraUsageDescription": "RecallAR uses the camera to recognize faces and objects to assist memory."
+      },
+      "bundleIdentifier": "com.jwtan05.recallar-v2"
     },
     "android": {
       "adaptiveIcon": {
@@ -36,7 +40,15 @@
         }
       ],
       "expo-sqlite",
-      "expo-secure-store"
+      "expo-secure-store",
+      "react-native-fast-tflite",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos for enrolling memories.",
+          "cameraPermission": "Allow $(PRODUCT_NAME) to take photos for enrolling memories."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
