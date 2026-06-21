@@ -29,6 +29,13 @@ export default function PatientHomeScreen() {
                 >
                     <Text style={styles.arButtonText}>Start AR</Text>
                 </Pressable>
+
+                <Pressable
+                    style={styles.reviewButton}
+                    onPress={() => router.push('/(patient)/training')}
+                >
+                    <Text style={styles.reviewButtonText}>Daily review</Text>
+                </Pressable>
             </View>
 
             <Pressable
@@ -79,6 +86,20 @@ function createStyles(theme: Theme) {
         },
         arButtonText: {
             color: theme.onPrimary,
+            fontSize: 18,
+            fontWeight: '700',
+        },
+        reviewButton: {
+            borderRadius: 14,
+            paddingVertical: 18,
+            paddingHorizontal: 48,
+            alignItems: 'center',
+            borderWidth: 1,
+            borderColor: theme.primary,
+            backgroundColor: theme.primarySoft,
+        },
+        reviewButtonText: {
+            color: theme.primaryText,
             fontSize: 18,
             fontWeight: '700',
         },
