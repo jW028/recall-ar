@@ -4,12 +4,15 @@ import { SQLiteProvider, useSQLiteContext, type SQLiteDatabase } from 'expo-sqli
 import { Suspense, useEffect, type ReactNode } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { MIGRATION_V2_DEVICE_PAIRING } from './migrations/v2_device_pairing';
+import { MIGRATION_V3_ASSET_PHOTO_POOL } from './migrations/v3_asset_photo_pool';
+import { MIGRATION_V4_SYNC_STATE } from './migrations/v4_sync_state';
+import { MIGRATION_V5_TRAINING_LATENCY } from './migrations/v5_training_latency';
 import { CREATE_TABLES } from './schema';
 
 const DATABASE_NAME = 'recallar.db';
 
 // Bump this number when a new migration is added in the MIGRATIONS array
-const LATEST_VERSION = 2;
+const LATEST_VERSION = 5;
 
 
 interface Migration {
@@ -28,6 +31,21 @@ const MIGRATIONS: Migration[] = [
       version: 2,
       description: 'Add DevicePairing table',
       sql: MIGRATION_V2_DEVICE_PAIRING,
+    },
+    {
+      version: 3,
+      description: 'Add photo_urls pool column to MemoryAsset',
+      sql: MIGRATION_V3_ASSET_PHOTO_POOL,
+    },
+    {
+      version: 4,
+      description: 'Add SyncState watermark table for pull sync',
+      sql: MIGRATION_V4_SYNC_STATE,
+    },
+    {
+      version: 5,
+      description: 'Add response_latency_ms to TrainingSession',
+      sql: MIGRATION_V5_TRAINING_LATENCY,
     },
 ]
 
@@ -68,10 +86,7 @@ interface DatabaseProviderProps {
     children: ReactNode;
 }
 
-// Bridges the SQLite context into the module-level `_db` ref so that
-// non-component code (services) can call getDatabase() outside of React.
-// Rendered as a child of SQLiteProvider, so useSQLiteContext() is only
-// reached once the database has finished initializing (post-Suspense).
+// Bridges the SQLite context into the module-level `_db` ref so that non-component code (services) can call getDatabase() outside of React. Rendered as a child of SQLiteProvider, so useSQLiteContext() is only reached once the database has finished initializing (post-Suspense).
 function DatabaseRefBridge({ children }: { children: ReactNode }) {
     const db = useSQLiteContext();
 
@@ -113,8 +128,7 @@ export function getDatabase(): SQLiteDatabase {
     return _db;
 }
 
-// Lets callers outside of React (e.g. services triggered by event listeners)
-// check readiness before calling getDatabase(), instead of relying on a try/catch.
+// Lets callers outside of React (e.g. services triggered by event listeners) check readiness before calling getDatabase(), instead of relying on a try/catch.
 export function isDatabaseReady(): boolean {
     return _db !== null;
 }

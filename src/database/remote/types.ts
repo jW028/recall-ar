@@ -291,6 +291,7 @@ export type Database = {
           next_review: string
           notes: string
           patient_id: string
+          photo_urls: Json | null
           relationship: string | null
           reminder_text: string | null
           review_count: number
@@ -310,6 +311,7 @@ export type Database = {
           next_review: string
           notes: string
           patient_id: string
+          photo_urls?: Json | null
           relationship?: string | null
           reminder_text?: string | null
           review_count?: number
@@ -329,6 +331,7 @@ export type Database = {
           next_review?: string
           notes?: string
           patient_id?: string
+          photo_urls?: Json | null
           relationship?: string | null
           reminder_text?: string | null
           review_count?: number
@@ -445,6 +448,7 @@ export type Database = {
         Row: {
           asset_id: string
           interval_minutes: number
+          response_latency_ms: number | null
           session_id: string
           success: boolean
           timestamp: string
@@ -452,6 +456,7 @@ export type Database = {
         Insert: {
           asset_id: string
           interval_minutes: number
+          response_latency_ms?: number | null
           session_id?: string
           success: boolean
           timestamp: string
@@ -459,6 +464,7 @@ export type Database = {
         Update: {
           asset_id?: string
           interval_minutes?: number
+          response_latency_ms?: number | null
           session_id?: string
           success?: boolean
           timestamp?: string
