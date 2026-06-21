@@ -1,7 +1,10 @@
+import { MAX_ENROLLMENT_PHOTOS, MIN_ENROLLMENT_PHOTOS } from '@/constants/config';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { isPerson } from '@/models/MemoryAsset';
 import { useMemoryAssetDetailViewModel } from '@/viewmodels/useMemoryAssetViewModel';
+import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -21,6 +24,7 @@ export default function AssetDetailScreen() {
     const router = useRouter();
     const theme = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
+    const { isOnline } = useNetworkStatus();
 
     const {
         asset,
@@ -30,11 +34,18 @@ export default function AssetDetailScreen() {
         isUpdating,
         updateError,
         clearUpdateError,
+        updatePool,
+        photoStep,
+        setThumbnail,
         deleteAsset,
         isDeleting,
     } = useMemoryAssetDetailViewModel(assetId);
 
     const [isEditing, setIsEditing] = useState(false);
+    // Pool editor working state. keepUrls = existing pool photos retained, newPhotoUris = local photos to add, thumbnail = chosen display photo.
+    const [keepUrls, setKeepUrls] = useState<string[]>([]);
+    const [newPhotoUris, setNewPhotoUris] = useState<string[]>([]);
+    const [thumbnail, setThumbnailState] = useState<string>('');
     const [name, setName] = useState('');
     const [notes, setNotes] = useState('');
     // Person fields
@@ -48,6 +59,9 @@ export default function AssetDetailScreen() {
         if (asset && isEditing) {
             setName(asset.name);
             setNotes(asset.notes);
+            setKeepUrls(asset.photoUrls);
+            setNewPhotoUris([]);
+            setThumbnailState(asset.imageUrl);
             if (isPerson(asset)) {
                 setDateOfBirth(asset.dateOfBirth ?? '');
                 setRelationship(asset.relationship ?? '');
@@ -64,7 +78,7 @@ export default function AssetDetailScreen() {
     };
 
     const handleSave = async () => {
-        if (!asset) return;
+        if (!asset || !canSave) return;
         const params = isPerson(asset)
             ? {
                 name: name.trim(),
@@ -78,9 +92,112 @@ export default function AssetDetailScreen() {
                 category: category.trim() || null,
                 reminderText: reminderText.trim() || null,
             };
-        const success = await updateAsset(params);
-        if (success) setIsEditing(false);
+
+        // 1. Text/metadata (offline-capable).
+        if (!(await updateAsset(params))) return;
+
+        // 2. Photo pool — uploads + re-averaged embedding (requires a connection).
+        if (poolChanged && !(await updatePool({ keepUrls, newPhotoUris }))) return;
+
+        // 3. Thumbnail — offline-capable. The chosen photo is always a kept existing URL, so it survives the pool update above.
+        if (thumbnailChanged && !(await setThumbnail(thumbnail))) return;
+
+        setIsEditing(false);
     };
+
+    const cancelEdit = () => {
+        setIsEditing(false);
+        setKeepUrls([]);
+        setNewPhotoUris([]);
+        setThumbnailState('');
+        if (updateError) clearUpdateError();
+    };
+
+    const poolCount = keepUrls.length + newPhotoUris.length;
+
+    async function pickPhoto() {
+        if (poolCount >= MAX_ENROLLMENT_PHOTOS) return;
+
+        Alert.alert('Add photo', 'Choose a source', [
+            {
+                text: 'Camera',
+                onPress: async () => {
+                    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+                    if (status !== 'granted') {
+                        Alert.alert('Camera access needed', 'Please enable camera access in Settings to take photos.');
+                        return;
+                    }
+                    const result = await ImagePicker.launchCameraAsync({
+                        allowsEditing: true,
+                        aspect: [1, 1],
+                        quality: 0.85,
+                    });
+                    if (!result.canceled && result.assets[0]) {
+                        setNewPhotoUris((prev) => [...prev, result.assets[0].uri]);
+                    }
+                },
+            },
+            {
+                text: 'Photo library',
+                onPress: async () => {
+                    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                    if (status !== 'granted') {
+                        Alert.alert('Photo library access needed', 'Please enable photo library access in Settings to pick photos.');
+                        return;
+                    }
+                    const result = await ImagePicker.launchImageLibraryAsync({
+                        allowsEditing: true,
+                        aspect: [1, 1],
+                        quality: 0.85,
+                    });
+                    if (!result.canceled && result.assets[0]) {
+                        setNewPhotoUris((prev) => [...prev, result.assets[0].uri]);
+                    }
+                },
+            },
+            { text: 'Cancel', style: 'cancel' },
+        ]);
+    }
+
+    const removeNewPhoto = (uri: string) =>
+        setNewPhotoUris((prev) => prev.filter((u) => u !== uri));
+
+    // Removing an existing pool photo; if it was the thumbnail, fall back to the first remaining existing photo (new photos aren't selectable until saved).
+    const removeKeepPhoto = (url: string) =>
+        setKeepUrls((prev) => {
+            const next = prev.filter((u) => u !== url);
+            if (thumbnail === url) setThumbnailState(next[0] ?? '');
+            return next;
+        });
+
+    // Only already-uploaded (existing) pool photos can be set as the thumbnail.
+    const selectThumbnail = (url: string) => {
+        setThumbnailState(url);
+        if (updateError) clearUpdateError();
+    };
+
+    const poolValid =
+        poolCount >= MIN_ENROLLMENT_PHOTOS && poolCount <= MAX_ENROLLMENT_PHOTOS;
+
+    // Pool composition changed if photos were added, or the kept set differs from the asset's current pool (i.e. some were removed).
+    const poolChanged =
+        !!asset &&
+        (newPhotoUris.length > 0 ||
+            keepUrls.length !== asset.photoUrls.length ||
+            keepUrls.some((u) => !asset.photoUrls.includes(u)));
+
+    const thumbnailChanged = !!asset && thumbnail !== '' && thumbnail !== asset.imageUrl;
+
+    const saveButtonLabel =
+        photoStep === 'processing' ? 'Processing photos…' :
+        photoStep === 'saving' || isUpdating ? 'Saving…' :
+        'Save';
+
+    // The 3–5 rule only applies when the pool is actually being changed, so metadata/thumbnail edits on legacy single-photo assets aren't blocked.
+    const canSave =
+        photoStep === 'idle' &&
+        !isUpdating &&
+        (!poolChanged || (poolValid && isOnline));
 
     const handleDelete = () => {
         Alert.alert(
@@ -175,6 +292,77 @@ export default function AssetDetailScreen() {
             {isEditing && (
                 <View style={styles.card}>
                     <View style={styles.field}>
+                        <Text style={styles.label}>Photos</Text>
+                        <Text style={styles.photoHint}>
+                            Keep {MIN_ENROLLMENT_PHOTOS}–{MAX_ENROLLMENT_PHOTOS} clear photos
+                            from different angles. Remove or add photos, and tap a photo to make
+                            it the thumbnail. Adding or removing photos re-runs recognition.
+                        </Text>
+                        {poolChanged && !isOnline && (
+                            <Text style={styles.offlineHint}>
+                                You're offline. A connection is required to change which photos
+                                are used.
+                            </Text>
+                        )}
+                        <View style={styles.photoGrid}>
+                            {/* Existing pool photos — selectable as thumbnail */}
+                            {keepUrls.map((url) => {
+                                const isThumb = thumbnail === url;
+                                return (
+                                    <Pressable
+                                        key={url}
+                                        style={[styles.photoSlot, isThumb && styles.photoSlotSelected]}
+                                        onPress={() => selectThumbnail(url)}
+                                    >
+                                        <Image source={{ uri: url }} style={styles.photoThumb} />
+                                        {isThumb && (
+                                            <View style={styles.thumbnailBadge}>
+                                                <Text style={styles.thumbnailBadgeText}>Thumbnail</Text>
+                                            </View>
+                                        )}
+                                        <Pressable
+                                            style={styles.removeBtn}
+                                            onPress={() => removeKeepPhoto(url)}
+                                            hitSlop={8}
+                                        >
+                                            <Text style={styles.removeBtnText}>×</Text>
+                                        </Pressable>
+                                    </Pressable>
+                                );
+                            })}
+                            {/* Newly added photos — set as thumbnail only after saving */}
+                            {newPhotoUris.map((uri) => (
+                                <View key={uri} style={styles.photoSlot}>
+                                    <Image source={{ uri }} style={styles.photoThumb} />
+                                    <View style={styles.newBadge}>
+                                        <Text style={styles.newBadgeText}>New</Text>
+                                    </View>
+                                    <Pressable
+                                        style={styles.removeBtn}
+                                        onPress={() => removeNewPhoto(uri)}
+                                        hitSlop={8}
+                                    >
+                                        <Text style={styles.removeBtnText}>×</Text>
+                                    </Pressable>
+                                </View>
+                            ))}
+                            {poolCount < MAX_ENROLLMENT_PHOTOS && (
+                                <Pressable style={styles.photoAdd} onPress={pickPhoto}>
+                                    <Text style={styles.photoAddIcon}>+</Text>
+                                    <Text style={styles.photoAddLabel}>
+                                        {poolCount}/{MAX_ENROLLMENT_PHOTOS}
+                                    </Text>
+                                </Pressable>
+                            )}
+                        </View>
+                        {poolChanged && !poolValid && (
+                            <Text style={styles.offlineHint}>
+                                Keep between {MIN_ENROLLMENT_PHOTOS} and {MAX_ENROLLMENT_PHOTOS} photos.
+                            </Text>
+                        )}
+                    </View>
+
+                    <View style={styles.field}>
                         <Text style={styles.label}>Name</Text>
                         <TextInput
                             style={styles.input}
@@ -243,13 +431,15 @@ export default function AssetDetailScreen() {
                     )}
 
                     <View style={styles.editActions}>
-                        <Pressable style={styles.cancelButton} onPress={() => setIsEditing(false)}>
+                        <Pressable style={styles.cancelButton} onPress={cancelEdit}>
                             <Text style={styles.cancelButtonText}>Cancel</Text>
                         </Pressable>
-                        <Pressable style={styles.saveButton} onPress={handleSave} disabled={isUpdating}>
-                            <Text style={styles.saveButtonText}>
-                                {isUpdating ? 'Saving…' : 'Save'}
-                            </Text>
+                        <Pressable
+                            style={[styles.saveButton, !canSave && styles.saveButtonDisabled]}
+                            onPress={handleSave}
+                            disabled={!canSave}
+                        >
+                            <Text style={styles.saveButtonText}>{saveButtonLabel}</Text>
                         </Pressable>
                     </View>
                 </View>
@@ -350,6 +540,70 @@ function createStyles(theme: Theme) {
         detailValue: { fontSize: 16, color: theme.body },
         field: { marginBottom: 16 },
         label: { fontSize: 14, fontWeight: '600', color: theme.label, marginBottom: 8 },
+        photoHint: { fontSize: 13, color: theme.textMuted, marginBottom: 12, lineHeight: 19 },
+        offlineHint: { fontSize: 13, color: theme.error, marginBottom: 12 },
+        photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+        photoSlot: {
+            position: 'relative',
+            borderRadius: 12,
+            borderWidth: 2,
+            borderColor: 'transparent',
+            padding: 2,
+        },
+        photoSlotSelected: { borderColor: theme.primary },
+        photoThumb: {
+            width: 76,
+            height: 76,
+            borderRadius: 10,
+            backgroundColor: theme.border,
+        },
+        thumbnailBadge: {
+            position: 'absolute',
+            bottom: 2,
+            left: 2,
+            right: 2,
+            backgroundColor: theme.primary,
+            borderBottomLeftRadius: 10,
+            borderBottomRightRadius: 10,
+            paddingVertical: 2,
+            alignItems: 'center',
+        },
+        thumbnailBadgeText: { color: theme.onPrimary, fontSize: 10, fontWeight: '700' },
+        newBadge: {
+            position: 'absolute',
+            bottom: 2,
+            left: 2,
+            backgroundColor: theme.textMuted,
+            borderRadius: 6,
+            paddingHorizontal: 6,
+            paddingVertical: 1,
+        },
+        newBadgeText: { color: theme.onPrimary, fontSize: 10, fontWeight: '700' },
+        removeBtn: {
+            position: 'absolute',
+            top: -6,
+            right: -6,
+            width: 22,
+            height: 22,
+            borderRadius: 11,
+            backgroundColor: theme.errorStrong,
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        removeBtnText: { color: '#fff', fontSize: 15, fontWeight: '700', lineHeight: 20 },
+        photoAdd: {
+            width: 76,
+            height: 76,
+            borderRadius: 10,
+            borderWidth: 2,
+            borderColor: theme.border,
+            borderStyle: 'dashed',
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: theme.surface,
+        },
+        photoAddIcon: { fontSize: 24, color: theme.textMuted },
+        photoAddLabel: { fontSize: 11, color: theme.textFaint, marginTop: 2 },
         input: {
             borderWidth: 1,
             borderColor: theme.borderStrong,
@@ -378,6 +632,7 @@ function createStyles(theme: Theme) {
             alignItems: 'center',
             borderRadius: 10,
         },
+        saveButtonDisabled: { backgroundColor: theme.primaryDisabled },
         saveButtonText: { color: theme.onPrimary, fontSize: 15, fontWeight: '600' },
         deleteButton: {
             paddingVertical: 16,
