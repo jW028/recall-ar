@@ -11,6 +11,22 @@ import {
 } from '@/services/MemoryAssetService';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+// Runs the on-device face-embedding model over the given photos and returns the averaged embedding. Shared by enrollment and photo re-enrollment. Throws on failure so callers can surface a message.
+async function computeFaceEmbedding(uris: string[]): Promise<number[]> {
+    const { FaceEmbeddingModel } =
+        require('@/ml/FaceEmbeddingModel') as typeof import('@/ml/FaceEmbeddingModel');
+    const { prepareImageTensor, averageEmbeddings } =
+        require('@/ml/ImagePreprocessor') as typeof import('@/ml/ImagePreprocessor');
+
+    await FaceEmbeddingModel.loadModel();
+    const embeddings: number[][] = [];
+    for (const uri of uris) {
+        const tensor = await prepareImageTensor(uri);
+        embeddings.push(FaceEmbeddingModel.runInference(tensor));
+    }
+    return averageEmbeddings(embeddings);
+}
+
 // List
 type TypeFilter = 'all' | 'Person' | 'Object';
 
@@ -69,6 +85,13 @@ interface UseMemoryAssetDetailViewModel {
     updateError: string | null;
     clearUpdateError: () => void;
 
+    // Photo pool editing: keep some existing pool URLs, add new local photos, and re-average the embedding over the resulting pool. photoStep reflects the heavier two phases (model inference, then upload + save).
+    updatePool: (params: { keepUrls: string[]; newPhotoUris: string[] }) => Promise<boolean>;
+    photoStep: 'idle' | 'processing' | 'saving';
+
+    // Thumbnail selection: repoints the display image at an existing pool photo. No upload or embedding change, so it works offline.
+    setThumbnail: (thumbnailUrl: string) => Promise<boolean>;
+
     deleteAsset: () => Promise<boolean>;
     isDeleting: boolean;
     deleteError: string | null;
@@ -83,6 +106,8 @@ export function useMemoryAssetDetailViewModel(
 
     const [isUpdating, setIsUpdating] = useState(false);
     const [updateError, setUpdateError] = useState<string | null>(null);
+
+    const [photoStep, setPhotoStep] = useState<'idle' | 'processing' | 'saving'>('idle');
 
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -122,6 +147,57 @@ export function useMemoryAssetDetailViewModel(
         [assetId]
     );
 
+    const updatePool = useCallback(
+        async ({
+            keepUrls,
+            newPhotoUris,
+        }: {
+            keepUrls: string[];
+            newPhotoUris: string[];
+        }): Promise<boolean> => {
+            if (!assetId) return false;
+            setUpdateError(null);
+            setPhotoStep('processing');
+            try {
+                // The embedding is averaged over the whole pool, so re-run the model over the kept (remote) photos plus the new local ones.
+                const embedding = await computeFaceEmbedding([...keepUrls, ...newPhotoUris]);
+                setPhotoStep('saving');
+                const result = await MemoryAssetService.updateAssetPool(assetId, {
+                    keepUrls,
+                    newPhotoUris,
+                    embedding,
+                });
+                if (result.error || !result.data) {
+                    setUpdateError(result.error ?? 'Failed to update photos.');
+                    return false;
+                }
+                setAsset(result.data);
+                return true;
+            } catch (e) {
+                setUpdateError(e instanceof Error ? e.message : 'Failed to process photos.');
+                return false;
+            } finally {
+                setPhotoStep('idle');
+            }
+        },
+        [assetId]
+    );
+
+    const setThumbnail = useCallback(
+        async (thumbnailUrl: string): Promise<boolean> => {
+            if (!assetId) return false;
+            setUpdateError(null);
+            const result = await MemoryAssetService.setThumbnail(assetId, thumbnailUrl);
+            if (result.error || !result.data) {
+                setUpdateError(result.error ?? 'Failed to update thumbnail.');
+                return false;
+            }
+            setAsset(result.data);
+            return true;
+        },
+        [assetId]
+    );
+
     const deleteAsset = useCallback(async (): Promise<boolean> => {
         if (!assetId) return false;
         setIsDeleting(true);
@@ -147,6 +223,9 @@ export function useMemoryAssetDetailViewModel(
         isUpdating,
         updateError,
         clearUpdateError,
+        updatePool,
+        photoStep,
+        setThumbnail,
         deleteAsset,
         isDeleting,
         deleteError,
@@ -196,19 +275,7 @@ export function useEnrollmentViewModel(
     async function generateEmbedding(uris: string[]): Promise<number[] | null> {
         setStep('processing');
         try {
-            const { FaceEmbeddingModel } =
-                require('@/ml/FaceEmbeddingModel') as typeof import('@/ml/FaceEmbeddingModel');
-            const { prepareImageTensor, averageEmbeddings } =
-                require('@/ml/ImagePreprocessor') as typeof import('@/ml/ImagePreprocessor');
-
-            await FaceEmbeddingModel.loadModel();
-            const embeddings: number[][] = [];
-            for (const uri of uris) {
-                const tensor = await prepareImageTensor(uri);
-                const emb = FaceEmbeddingModel.runInference(tensor);
-                embeddings.push(emb);
-            }
-            return averageEmbeddings(embeddings);
+            return await computeFaceEmbedding(uris);
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to process photos.');
             setStep('idle');

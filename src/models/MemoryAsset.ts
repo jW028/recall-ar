@@ -6,8 +6,9 @@ interface MemoryAssetBase {
     patientId: string;
     name: string;
     status: MemoryAssetStatus;
-    imageUrl: string;
-    embedding: number[]; // length must equal EMBEDDING_DIM 
+    imageUrl: string; // the chosen thumbnail; always one of photoUrls
+    photoUrls: string[]; // pool of reference photos (public URLs); imageUrl ∈ photoUrls
+    embedding: number[]; // length must equal EMBEDDING_DIM, averaged over photoUrls
     notes: string;
     currentIntervalMinutes: number;
     nextReview: string; // ISO-8601 timestamp
