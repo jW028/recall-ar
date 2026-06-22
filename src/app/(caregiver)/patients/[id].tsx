@@ -91,6 +91,10 @@ export default function PatientDetailScreen() {
     router.push(`/(caregiver)/patients/${id}/assets`);
     };
 
+    const goToAnalytics = () => {
+    router.push(`/(caregiver)/patients/${id}/analytics`);
+    };
+
     if (isLoading && !patient) {
     return (
         <View style={styles.loadingContainer}>
@@ -211,6 +215,10 @@ export default function PatientDetailScreen() {
         <>
             <Pressable style={styles.pairButton} onPress={goToAssets}>
             <Text style={styles.pairButtonText}>Memory assets</Text>
+            </Pressable>
+
+            <Pressable style={styles.pairButton} onPress={goToAnalytics}>
+            <Text style={styles.pairButtonText}>📊 Analytics & Reports</Text>
             </Pressable>
 
             <Pressable style={styles.pairButton} onPress={goToPairDevice}>

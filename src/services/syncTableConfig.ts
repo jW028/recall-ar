@@ -7,7 +7,8 @@ export type SyncableTable =
   | 'Patient'
   | 'MemoryAsset'
   | 'TrainingSession'
-  | 'DailyReviewEntry';
+  | 'DailyReviewEntry'
+  | 'CognitiveReport';
 
 // The pull side of a table's config. Absent for push-only tables (e.g. the training tables flow patient -> Supabase only and are never pulled back).
 interface PullConfig<TSupabaseRow = any> {
@@ -160,6 +161,20 @@ export const syncTableConfig: Record<SyncableTable, SyncTableConfig> = {
         // SQLite has no boolean type — both flags are stored as 0/1
         is_onboarding: row.is_onboarding === 1,
         completed: row.completed === 1,
+    }),
+    },
+
+    // Push-only: reports are generated caregiver-side and pushed up; never pulled back.
+    CognitiveReport: {
+    supabaseTable: 'CognitiveReport',
+    primaryKey: 'report_id',
+    readLocalRow: readByPrimaryKey('CognitiveReport', 'report_id'),
+    toSupabaseRow: (row) => ({
+        report_id: row.report_id,
+        patient_id: row.patient_id,
+        generated_date: row.generated_date,
+        // SQLite stores report_data as a JSON string; Supabase expects a jsonb object.
+        report_data: JSON.parse(row.report_data as string),
     }),
     },
 };

@@ -89,6 +89,12 @@ export default function TrainingScreen() {
                 <Text style={styles.prompt}>{prompt}</Text>
             </View>
 
+            {error && !revealed && (
+                <View style={styles.errorBanner}>
+                    <Text style={styles.errorBannerText}>{error}</Text>
+                </View>
+            )}
+
             <View style={styles.choices} onLayout={markRendered}>
                 {choices.map((choice) => (
                     <ChoiceButton
@@ -197,6 +203,21 @@ function createStyles(theme: Theme) {
             fontSize: 26,
             fontWeight: '700',
             color: theme.body,
+            textAlign: 'center',
+        },
+        errorBanner: {
+            backgroundColor: theme.errorBackground,
+            borderColor: theme.errorBorder,
+            borderWidth: 1,
+            borderRadius: 12,
+            paddingVertical: 12,
+            paddingHorizontal: 16,
+            marginBottom: 16,
+        },
+        errorBannerText: {
+            color: theme.error,
+            fontSize: 15,
+            fontWeight: '600',
             textAlign: 'center',
         },
         choices: {
