@@ -72,6 +72,21 @@ async function runMigrations(db: SQLiteDatabase): Promise<void> {
     console.log(`[DB] Migration complete. Current schema: v${LATEST_VERSION}`);
 }
 
+// Defensive backfill for column drift: some dev DBs reached user_version 5 before the response_latency_ms ALTER was wired into v5, so the migration was skipped and the column is missing. Add it if absent — idempotent and safe on healthy DBs.
+async function ensureColumns(db: SQLiteDatabase): Promise<void> {
+    const cols = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(TrainingSession)`);
+    if (!cols.some((c) => c.name === 'response_latency_ms')) {
+        console.log('[DB] Backfilling missing column TrainingSession.response_latency_ms');
+        await db.execAsync(`ALTER TABLE TrainingSession ADD COLUMN response_latency_ms INTEGER;`);
+    }
+}
+
+// onInit entry point: run versioned migrations, then reconcile any column drift.
+async function initDatabase(db: SQLiteDatabase): Promise<void> {
+    await runMigrations(db);
+    await ensureColumns(db);
+}
+
 // DB initialization UI
 function DatabaseLoadingFallback() {
     return (
@@ -102,7 +117,7 @@ export function DatabaseProvider({ children }: DatabaseProviderProps) {
         <Suspense fallback={<DatabaseLoadingFallback />}>
             <SQLiteProvider
                 databaseName={DATABASE_NAME}
-                onInit={runMigrations}
+                onInit={initDatabase}
                 useSuspense
             >
                 <DatabaseRefBridge>{children}</DatabaseRefBridge>
