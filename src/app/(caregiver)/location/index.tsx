@@ -1,7 +1,8 @@
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useCurrentPatientId } from '@/store/currentPatientStore';
 import { useGeofenceListViewModel, usePatientGeofenceEventsViewModel, usePatientLocationViewModel } from '@/viewmodels/useGeofenceViewModels';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -31,7 +32,7 @@ function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: num
 }
 
 export default function GeofenceListScreen() {
-    const { id: patientId } = useLocalSearchParams<{ id: string }>();
+    const patientId = useCurrentPatientId() ?? undefined;
     const router = useRouter();
     const theme = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
@@ -369,7 +370,7 @@ export default function GeofenceListScreen() {
                             style={styles.addButton}
                             onPress={() => {
                                 setIsSettingsOpen(false);
-                                router.push(`/(caregiver)/patients/${patientId}/geofences/create`);
+                                router.push(`/(caregiver)/location/create`);
                             }}
                         >
                             <Text style={styles.addButtonText}>+ Add New Geofence</Text>
@@ -394,7 +395,7 @@ export default function GeofenceListScreen() {
                                 onPress={() => {
                                     setIsSettingsOpen(false);
                                     router.push(
-                                        `/(caregiver)/patients/${patientId}/geofences/${geofence.geofenceId}`
+                                        `/(caregiver)/location/${geofence.geofenceId}`
                                     );
                                 }}
                             >

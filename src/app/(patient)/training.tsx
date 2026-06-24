@@ -2,6 +2,7 @@ import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { isPerson, type MemoryAsset } from '@/models/MemoryAsset';
 import { useTrainingViewModel } from '@/viewmodels/useTrainingViewModel';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import {
@@ -12,16 +13,18 @@ import {
     Text,
     View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TrainingScreen() {
     const theme = useTheme();
+    const insets = useSafeAreaInsets();
     const styles = useMemo(() => createStyles(theme), [theme]);
     const router = useRouter();
 
     const { status, error, question, progress, lastResult, isSubmitting, answer, next, markRendered } =
         useTrainingViewModel();
 
-    const goHome = () => router.back();
+    const goHome = () => router.navigate('/(patient)');
 
     if (status === 'loading') {
         return (
@@ -74,10 +77,11 @@ export default function TrainingScreen() {
     const revealed = lastResult !== null;
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
             <View style={styles.header}>
-                <Pressable onPress={goHome} hitSlop={12}>
-                    <Text style={styles.backText}>‹ Back</Text>
+                <Pressable onPress={goHome} hitSlop={12} style={styles.backButton}>
+                    <Ionicons name="chevron-back" size={22} color={theme.primary} />
+                    <Text style={styles.backText}>Home</Text>
                 </Pressable>
                 <Text style={styles.progress}>
                     {progress.current} of {progress.total}
@@ -169,7 +173,6 @@ function createStyles(theme: Theme) {
             flex: 1,
             backgroundColor: theme.surface,
             paddingHorizontal: 24,
-            paddingTop: 56,
             paddingBottom: 32,
         },
         centered: {
@@ -186,6 +189,7 @@ function createStyles(theme: Theme) {
             alignItems: 'center',
             marginBottom: 16,
         },
+        backButton: { flexDirection: 'row', alignItems: 'center', marginLeft: -4 },
         backText: { fontSize: 16, color: theme.primary, fontWeight: '600' },
         progress: { fontSize: 15, color: theme.textMuted, fontWeight: '600' },
         questionArea: {

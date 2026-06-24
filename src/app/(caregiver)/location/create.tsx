@@ -1,8 +1,9 @@
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useCurrentPatientId } from '@/store/currentPatientStore';
 import { useGeofenceListViewModel } from '@/viewmodels/useGeofenceViewModels';
 import * as Location from 'expo-location';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -57,7 +58,7 @@ function regionForRadius(lat: number, lon: number, radiusM: number): Region {
 
 // ─────────────────────────────────────────────────────────────────
 export default function GeofenceCreateScreen() {
-    const { id: patientId } = useLocalSearchParams<{ id: string }>();
+    const patientId = useCurrentPatientId() ?? undefined;
     const router = useRouter();
     const theme = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);

@@ -7,9 +7,10 @@ import { useTheme } from '@/hooks/use-theme';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { validate } from '@/utils/validation';
 import { FormField } from '@/components/common/FormField';
+import { useCurrentPatientId } from '@/store/currentPatientStore';
 import { useEnrollmentViewModel } from '@/viewmodels/useMemoryAssetViewModel';
 import * as ImagePicker from 'expo-image-picker';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
     Alert,
@@ -26,7 +27,7 @@ import {
 type AssetType = 'Person' | 'Object';
 
 export default function NewAssetScreen() {
-    const { id: patientId } = useLocalSearchParams<{ id: string }>();
+    const patientId = useCurrentPatientId() ?? undefined;
     const router = useRouter();
     const theme = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);

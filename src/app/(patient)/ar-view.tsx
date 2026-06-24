@@ -1,19 +1,16 @@
+import { Button } from '@/components/common/Button';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useARViewModel } from '@/viewmodels/useARViewModel';
 import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
-import {
-    ActivityIndicator,
-    Pressable,
-    StyleSheet,
-    Text,
-    View,
-} from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Camera } from 'react-native-vision-camera';
 
 export default function ARViewScreen() {
     const theme = useTheme();
+    const insets = useSafeAreaInsets();
     const styles = useMemo(() => createStyles(theme), [theme]);
     const router = useRouter();
 
@@ -27,19 +24,17 @@ export default function ARViewScreen() {
         photoOutput,
     } = useARViewModel();
 
+    // Screen is already inset above the tab bar; small gap is enough
+    const overlayBottom = 24;
+
     if (!hasPermission) {
         return (
-            <View style={styles.centered}>
-                <Pressable style={styles.backButtonCentered} onPress={() => router.back()}>
-                    <Text style={styles.backButtonCenteredText}>‹ Back</Text>
-                </Pressable>
+            <View style={[styles.centered, { paddingTop: insets.top + 16 }]}>
                 <Text style={styles.permissionTitle}>Camera access needed</Text>
                 <Text style={styles.permissionBody}>
                     RecallAR needs camera access to recognize faces and objects.
                 </Text>
-                <Pressable style={styles.button} onPress={requestPermission}>
-                    <Text style={styles.buttonText}>Allow camera</Text>
-                </Pressable>
+                <Button label="Allow camera" icon="camera-outline" onPress={requestPermission} />
             </View>
         );
     }
@@ -67,28 +62,22 @@ export default function ARViewScreen() {
                 />
             )}
 
-            <Pressable style={styles.backButton} onPress={() => router.back()}>
-                <Text style={styles.backButtonText}>‹ Back</Text>
-            </Pressable>
-
             {isInitializing && (
                 <View style={styles.initOverlay}>
-                    <ActivityIndicator size="large" color="#fff" />
+                    <ActivityIndicator size="large" color={theme.onPrimary} />
                     <Text style={styles.initText}>Loading recognition model…</Text>
                 </View>
             )}
 
             {initError && (
-                <View style={styles.errorOverlay}>
+                <View style={[styles.errorOverlay, { bottom: overlayBottom }]}>
                     <Text style={styles.errorText}>{initError}</Text>
-                    <Pressable style={styles.retryButton} onPress={() => router.back()}>
-                        <Text style={styles.retryButtonText}>Go back</Text>
-                    </Pressable>
+                    <Button label="Go back" variant="secondary" onPress={() => router.replace('/(patient)')} />
                 </View>
             )}
 
             {!isInitializing && !initError && (
-                <View style={styles.resultContainer}>
+                <View style={[styles.resultContainer, { bottom: overlayBottom }]}>
                     {overlayLabel ? (
                         <View style={styles.recognizedCard}>
                             <Text style={styles.recognizedLabel}>{overlayLabel}</Text>
@@ -108,7 +97,7 @@ function createStyles(theme: Theme) {
     return StyleSheet.create({
         container: {
             flex: 1,
-            backgroundColor: '#000',
+            backgroundColor: theme.scrim,
         },
         centered: {
             flex: 1,
@@ -116,22 +105,12 @@ function createStyles(theme: Theme) {
             alignItems: 'center',
             backgroundColor: theme.surface,
             paddingHorizontal: 32,
-        },
-        backButtonCentered: {
-            position: 'absolute',
-            top: 60,
-            left: 24,
-        },
-        backButtonCenteredText: {
-            fontSize: 16,
-            color: theme.primary,
-            fontWeight: '600',
+            gap: 12,
         },
         permissionTitle: {
             fontSize: 22,
             fontWeight: '700',
-            color: theme.body,
-            marginBottom: 12,
+            color: theme.heading,
             textAlign: 'center',
         },
         permissionBody: {
@@ -139,35 +118,10 @@ function createStyles(theme: Theme) {
             color: theme.textMuted,
             textAlign: 'center',
             lineHeight: 22,
-            marginBottom: 24,
-        },
-        button: {
-            backgroundColor: theme.primary,
-            borderRadius: 10,
-            paddingVertical: 14,
-            paddingHorizontal: 28,
-            alignItems: 'center',
-        },
-        buttonText: {
-            color: theme.onPrimary,
-            fontSize: 16,
-            fontWeight: '600',
-        },
-        backButton: {
-            position: 'absolute',
-            top: 60,
-            left: 24,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            paddingVertical: 8,
-            paddingHorizontal: 14,
-            borderRadius: 20,
-        },
-        backButtonText: {
-            color: '#fff',
-            fontSize: 16,
-            fontWeight: '600',
+            marginBottom: 12,
         },
         initOverlay: {
+            // Dark scrim over the live camera feed
             ...StyleSheet.absoluteFillObject,
             backgroundColor: 'rgba(0,0,0,0.75)',
             justifyContent: 'center',
@@ -175,64 +129,52 @@ function createStyles(theme: Theme) {
             gap: 16,
         },
         initText: {
-            color: '#fff',
+            color: theme.onPrimary,
             fontSize: 16,
             fontWeight: '500',
         },
         errorOverlay: {
             position: 'absolute',
-            bottom: 120,
             left: 24,
             right: 24,
-            backgroundColor: 'rgba(180,0,0,0.85)',
-            borderRadius: 12,
+            backgroundColor: theme.errorStrong,
+            borderRadius: 16,
             padding: 20,
             alignItems: 'center',
             gap: 12,
         },
         errorText: {
-            color: '#fff',
+            color: theme.onPrimary,
             fontSize: 14,
             textAlign: 'center',
         },
-        retryButton: {
-            backgroundColor: 'rgba(255,255,255,0.2)',
-            borderRadius: 8,
-            paddingVertical: 8,
-            paddingHorizontal: 20,
-        },
-        retryButtonText: {
-            color: '#fff',
-            fontSize: 14,
-            fontWeight: '600',
-        },
         resultContainer: {
             position: 'absolute',
-            bottom: 80,
             left: 24,
             right: 24,
             alignItems: 'center',
         },
         recognizedCard: {
-            backgroundColor: 'rgba(16, 185, 129, 0.92)',
+            backgroundColor: theme.success,
             borderRadius: 16,
             paddingVertical: 16,
             paddingHorizontal: 28,
         },
         recognizedLabel: {
-            color: '#fff',
+            color: theme.onPrimary,
             fontSize: 22,
             fontWeight: '700',
             textAlign: 'center',
         },
         statusCard: {
+            // Neutral scrim chip over the camera feed
             backgroundColor: 'rgba(0,0,0,0.55)',
             borderRadius: 16,
             paddingVertical: 12,
             paddingHorizontal: 24,
         },
         statusLabel: {
-            color: 'rgba(255,255,255,0.75)',
+            color: 'rgba(255,255,255,0.85)',
             fontSize: 15,
             fontWeight: '500',
         },

@@ -1,7 +1,7 @@
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useCurrentPatientId } from '@/store/currentPatientStore';
 import { useThreatListViewModel } from '@/viewmodels/useThreatViewModel';
-import { useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
 import {
     ActivityIndicator,
@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 
 export default function ThreatListScreen() {
-    const { id: patientId } = useLocalSearchParams<{ id: string }>();
+    const patientId = useCurrentPatientId() ?? undefined;
     const theme = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
 

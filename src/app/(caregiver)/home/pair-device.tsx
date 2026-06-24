@@ -1,8 +1,9 @@
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useCurrentPatientId } from '@/store/currentPatientStore';
 import { useDevicePairingViewModel } from '@/viewmodels/useDevicePairingViewModel';
 import { usePatientDetailViewModel } from '@/viewmodels/usePatientViewModel';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useEffect, useMemo } from 'react';
 import { ActivityIndicator, Clipboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
@@ -14,7 +15,7 @@ function formatCountdown(seconds: number): string {
 }
 
 export default function PairDeviceScreen() {
-    const { id } = useLocalSearchParams<{ id: string }>();
+    const id = useCurrentPatientId() ?? undefined;
     const router = useRouter();
     const theme = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);

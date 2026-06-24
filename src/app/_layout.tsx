@@ -5,6 +5,7 @@ import { PairingService } from '@/services/PairingService';
 import { useAuthStore } from '@/store/authStore';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 function AuthGuard() {
   const router = useRouter();
@@ -60,7 +61,7 @@ function AuthGuard() {
         }
         if (user?.role === 'caregiver') {
           if (!inCaregiverGroup) {
-            router.replace('/(caregiver)/patients');
+            router.replace('/(caregiver)/home');
           }
           return;
         }
@@ -72,9 +73,11 @@ function AuthGuard() {
 export default function RootLayout() {
   useNetworkStatus(); // Auto-sync on reconnect
   return (
-    <DatabaseProvider>
-      <AuthGuard />
-      <Stack screenOptions={{ headerShown: false}} />
-    </DatabaseProvider>
+    <SafeAreaProvider>
+      <DatabaseProvider>
+        <AuthGuard />
+        <Stack screenOptions={{ headerShown: false}} />
+      </DatabaseProvider>
+    </SafeAreaProvider>
   );
 }
