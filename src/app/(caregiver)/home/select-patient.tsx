@@ -1,9 +1,14 @@
+import { Button } from '@/components/common/Button';
+import { EmptyState } from '@/components/common/EmptyState';
+import { Screen } from '@/components/common/Screen';
+import { ScreenHeader } from '@/components/common/ScreenHeader';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Patient } from '@/models/Patient';
-import { AuthService } from '@/services/AuthService';
 import { useAuthStore } from '@/store/authStore';
+import { useCurrentPatientId, useCurrentPatientStore } from '@/store/currentPatientStore';
 import { usePatientListViewModel } from '@/viewmodels/usePatientViewModel';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import {
@@ -29,15 +34,22 @@ function calculateAge(dateOfBirth: string): number {
 
 function PatientCard({
   patient,
+  selected,
   onPress,
   styles,
+  theme,
 }: {
   patient: Patient;
+  selected: boolean;
   onPress: () => void;
   styles: ReturnType<typeof createStyles>;
+  theme: Theme;
 }) {
   return (
-    <Pressable style={styles.card} onPress={onPress}>
+    <Pressable
+      style={({ pressed }) => [styles.card, selected && styles.cardSelected, pressed && styles.cardPressed]}
+      onPress={onPress}
+    >
       <View style={styles.avatar}>
         <Text style={styles.avatarText}>
           {patient.patientName.charAt(0).toUpperCase()}
@@ -49,36 +61,20 @@ function PatientCard({
           {calculateAge(patient.dateOfBirth)} years old
         </Text>
       </View>
-      <Text style={styles.chevron}>›</Text>
+      <Ionicons
+        name={selected ? 'checkmark-circle' : 'chevron-forward'}
+        size={22}
+        color={selected ? theme.primary : theme.textFaint}
+      />
     </Pressable>
-  );
-}
-
-function EmptyState({
-  onAddPatient,
-  styles,
-}: {
-  onAddPatient: () => void;
-  styles: ReturnType<typeof createStyles>;
-}) {
-  return (
-    <View style={styles.emptyState}>
-      <Text style={styles.emptyTitle}>No patients yet</Text>
-      <Text style={styles.emptyBody}>
-        Add a patient profile to start setting up memory training and AR
-        recognition.
-      </Text>
-      <Pressable style={styles.emptyButton} onPress={onAddPatient}>
-        <Text style={styles.emptyButtonText}>Add patient</Text>
-      </Pressable>
-    </View>
   );
 }
 
 export default function PatientListScreen() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
-  const clearAuth = useAuthStore((state) => state.clearAuth);
+  const currentPatientId = useCurrentPatientId();
+  const setCurrentPatient = useCurrentPatientStore((s) => s.setCurrentPatient);
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -91,36 +87,35 @@ export default function PatientListScreen() {
     [patients]
   );
 
-  const goToNewPatient = () => router.push('/(caregiver)/patients/new');
-  const goToPatientDetail = (patientId: string) =>
-    router.push(`/(caregiver)/patients/${patientId}`);
-
-  const handleSignOut = async () => {
-    await AuthService.signOut();
-    clearAuth();
+  const goToNewPatient = () => router.push('/(caregiver)/home/new-patient');
+  // Choose the active patient and return to the dashboard
+  const selectPatient = (patientId: string) => {
+    setCurrentPatient(patientId);
+    router.back();
   };
 
   if (isLoading && patients.length === 0) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.primary} />
-      </View>
+      <Screen>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.primary} />
+        </View>
+      </Screen>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Patients</Text>
-        <View style={styles.headerActions}>
-          <Pressable style={styles.addButton} onPress={goToNewPatient}>
-            <Text style={styles.addButtonText}>+ Add</Text>
+    <Screen>
+      <ScreenHeader
+        title="Select patient"
+        showBack
+        right={
+          <Pressable style={styles.addButton} onPress={goToNewPatient} hitSlop={6}>
+            <Ionicons name="add" size={20} color={theme.onPrimary} />
+            <Text style={styles.addButtonText}>Add</Text>
           </Pressable>
-          <Pressable style={styles.signOutButton} onPress={handleSignOut}>
-            <Text style={styles.signOutButtonText}>Sign out</Text>
-          </Pressable>
-        </View>
-      </View>
+        }
+      />
 
       {error && (
         <View style={styles.errorBox}>
@@ -138,74 +133,52 @@ export default function PatientListScreen() {
         renderItem={({ item }) => (
           <PatientCard
             patient={item}
-            onPress={() => goToPatientDetail(item.patientId)}
+            selected={item.patientId === currentPatientId}
+            onPress={() => selectPatient(item.patientId)}
             styles={styles}
+            theme={theme}
           />
         )}
         ListEmptyComponent={
-          <EmptyState onAddPatient={goToNewPatient} styles={styles} />
+          <EmptyState
+            icon="people-outline"
+            title="No patients yet"
+            body="Add a patient profile to start setting up memory training and AR recognition."
+            action={<Button label="Add patient" icon="add" onPress={goToNewPatient} />}
+          />
         }
       />
-    </View>
+    </Screen>
   );
 }
 
 function createStyles(theme: Theme) {
   return StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme.surface,
-    },
     loadingContainer: {
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
       backgroundColor: theme.surface,
     },
-    header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingHorizontal: 20,
-      paddingTop: 56,
-      paddingBottom: 16,
-    },
-    title: {
-      fontSize: 28,
-      fontWeight: '700',
-      color: theme.body,
-    },
-    headerActions: {
-      flexDirection: 'row',
-      gap: 8,
-      alignItems: 'center',
-    },
     addButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
       backgroundColor: theme.primary,
-      borderRadius: 8,
-      paddingHorizontal: 16,
-      paddingVertical: 10,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 9,
     },
     addButtonText: {
       color: theme.onPrimary,
       fontSize: 15,
       fontWeight: '600',
     },
-    signOutButton: {
-      borderRadius: 8,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-    },
-    signOutButtonText: {
-      color: theme.textMuted,
-      fontSize: 15,
-      fontWeight: '500',
-    },
     errorBox: {
       backgroundColor: theme.errorBackground,
       borderColor: theme.errorBorder,
       borderWidth: 1,
-      borderRadius: 8,
+      borderRadius: 12,
       padding: 12,
       marginHorizontal: 20,
       marginBottom: 12,
@@ -216,6 +189,7 @@ function createStyles(theme: Theme) {
     },
     listContent: {
       paddingHorizontal: 20,
+      paddingTop: 4,
       paddingBottom: 24,
       flexGrow: 1,
     },
@@ -228,6 +202,13 @@ function createStyles(theme: Theme) {
       marginBottom: 12,
       borderWidth: 1,
       borderColor: theme.border,
+    },
+    cardSelected: {
+      borderColor: theme.primary,
+      backgroundColor: theme.primaryMuted,
+    },
+    cardPressed: {
+      opacity: 0.7,
     },
     avatar: {
       width: 48,
@@ -255,41 +236,6 @@ function createStyles(theme: Theme) {
     cardMeta: {
       fontSize: 14,
       color: theme.textMuted,
-    },
-    chevron: {
-      fontSize: 24,
-      color: theme.borderStrong,
-    },
-    emptyState: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingHorizontal: 32,
-      paddingTop: 80,
-    },
-    emptyTitle: {
-      fontSize: 20,
-      fontWeight: '700',
-      color: theme.body,
-      marginBottom: 8,
-    },
-    emptyBody: {
-      fontSize: 15,
-      color: theme.textMuted,
-      textAlign: 'center',
-      lineHeight: 22,
-      marginBottom: 24,
-    },
-    emptyButton: {
-      backgroundColor: theme.primary,
-      borderRadius: 10,
-      paddingHorizontal: 24,
-      paddingVertical: 14,
-    },
-    emptyButtonText: {
-      color: theme.onPrimary,
-      fontSize: 15,
-      fontWeight: '600',
     },
   });
 }

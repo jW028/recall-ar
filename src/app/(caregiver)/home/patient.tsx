@@ -1,7 +1,8 @@
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useCurrentPatientId } from '@/store/currentPatientStore';
 import { usePatientDetailViewModel } from '@/viewmodels/usePatientViewModel';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
@@ -15,7 +16,7 @@ import {
 } from 'react-native';
 
 export default function PatientDetailScreen() {
-    const { id } = useLocalSearchParams<{ id: string }>();
+    const id = useCurrentPatientId() ?? undefined;
     const router = useRouter();
     const theme = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
@@ -84,15 +85,7 @@ export default function PatientDetailScreen() {
     };
 
     const goToPairDevice = () => {
-    router.push(`/(caregiver)/patients/${id}/pair-device`);
-    };
-
-    const goToAssets = () => {
-    router.push(`/(caregiver)/patients/${id}/assets`);
-    };
-
-    const goToAnalytics = () => {
-    router.push(`/(caregiver)/patients/${id}/analytics`);
+    router.push(`/(caregiver)/home/pair-device`);
     };
 
     if (isLoading && !patient) {
@@ -213,32 +206,9 @@ export default function PatientDetailScreen() {
         {/* Actions */}
         {!isEditing && (
         <>
-            <Pressable style={styles.pairButton} onPress={goToAssets}>
-            <Text style={styles.pairButtonText}>Memory assets</Text>
-            </Pressable>
-
-            <Pressable style={styles.pairButton} onPress={goToAnalytics}>
-            <Text style={styles.pairButtonText}>📊 Analytics & Reports</Text>
-            </Pressable>
-
             <Pressable style={styles.pairButton} onPress={goToPairDevice}>
-            <Text style={styles.pairButtonText}>📱 Pair patient device</Text>
+            <Text style={styles.pairButtonText}>Pair patient device</Text>
             </Pressable>
-
-            <Pressable
-            style={styles.pairButton}
-            onPress={() => router.push(`/(caregiver)/patients/${id}/geofences`)}
-            >
-            <Text style={styles.pairButtonText}>🗺️ Manage Geofences</Text>
-            </Pressable>
-
-            <Pressable
-            style={styles.pairButton}
-            onPress={() => router.push(`/(caregiver)/patients/${id}/threats`)}
-            >
-            <Text style={styles.pairButtonText}>⚠️ View Threats</Text>
-            </Pressable>
-
 
             <Pressable
             style={styles.deleteButton}

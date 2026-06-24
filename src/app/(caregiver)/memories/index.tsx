@@ -1,9 +1,14 @@
+import { EmptyState as SharedEmptyState } from '@/components/common/EmptyState';
+import { Screen } from '@/components/common/Screen';
+import { ScreenHeader } from '@/components/common/ScreenHeader';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { isPerson } from '@/models/MemoryAsset';
 import type { MemoryAsset } from '@/models/MemoryAsset';
+import { useCurrentPatientId } from '@/store/currentPatientStore';
 import { useMemoryAssetListViewModel } from '@/viewmodels/useMemoryAssetViewModel';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { Image } from 'react-native';
 import { useMemo } from 'react';
 import {
@@ -30,17 +35,24 @@ function AssetCard({
     const subtitle = isPerson(asset)
         ? asset.relationship ?? 'Person'
         : asset.category ?? 'Object';
+    const isPaused = asset.status === 'Paused';
 
     return (
-        <Pressable style={styles.card} onPress={onPress}>
+        <Pressable style={[styles.card, isPaused && styles.cardPaused]} onPress={onPress}>
             <Image source={{ uri: asset.imageUrl }} style={styles.thumbnail} />
             <View style={styles.cardInfo}>
                 <Text style={styles.cardName}>{asset.name}</Text>
                 <Text style={styles.cardMeta}>{subtitle}</Text>
             </View>
-            <View style={[styles.typeBadge, asset.type === 'Person' ? styles.badgePerson : styles.badgeObject]}>
-                <Text style={styles.typeBadgeText}>{asset.type}</Text>
-            </View>
+            {isPaused ? (
+                <View style={[styles.typeBadge, styles.badgePaused]}>
+                    <Text style={[styles.typeBadgeText, styles.badgePausedText]}>Paused</Text>
+                </View>
+            ) : (
+                <View style={[styles.typeBadge, asset.type === 'Person' ? styles.badgePerson : styles.badgeObject]}>
+                    <Text style={styles.typeBadgeText}>{asset.type}</Text>
+                </View>
+            )}
             <Text style={styles.chevron}>›</Text>
         </Pressable>
     );
@@ -107,7 +119,7 @@ function EmptyState({
 }
 
 export default function AssetListScreen() {
-    const { id: patientId } = useLocalSearchParams<{ id: string }>();
+    const patientId = useCurrentPatientId() ?? undefined;
     const router = useRouter();
     const theme = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
@@ -115,29 +127,45 @@ export default function AssetListScreen() {
     const { filteredAssets, isLoading, error, refresh, typeFilter, setTypeFilter } =
         useMemoryAssetListViewModel(patientId);
 
-    const goToNew = () => router.push(`/(caregiver)/patients/${patientId}/assets/new`);
+    const goToNew = () => router.push(`/(caregiver)/memories/new`);
     const goToAsset = (assetId: string) =>
-        router.push(`/(caregiver)/patients/${patientId}/assets/${assetId}`);
+        router.push(`/(caregiver)/memories/${assetId}`);
+
+    if (!patientId) {
+        return (
+            <Screen>
+                <ScreenHeader title="Memories" />
+                <SharedEmptyState
+                    icon="people-outline"
+                    title="No patient selected"
+                    body="Select a patient on the Home tab to manage their memories."
+                />
+            </Screen>
+        );
+    }
 
     if (isLoading && filteredAssets.length === 0) {
         return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={theme.primary} />
-            </View>
+            <Screen>
+                <ScreenHeader title="Memories" />
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={theme.primary} />
+                </View>
+            </Screen>
         );
     }
 
     return (
-        <View style={styles.container}>
-            <View style={styles.header}>
-                <Pressable style={styles.backButton} onPress={() => router.back()}>
-                    <Text style={styles.backButtonText}>‹ Back</Text>
-                </Pressable>
-                <Text style={styles.title}>Memories</Text>
-                <Pressable style={styles.addButton} onPress={goToNew}>
-                    <Text style={styles.addButtonText}>+ Add</Text>
-                </Pressable>
-            </View>
+        <Screen>
+            <ScreenHeader
+                title="Memories"
+                right={
+                    <Pressable style={styles.addButton} onPress={goToNew} hitSlop={6}>
+                        <Ionicons name="add" size={20} color={theme.onPrimary} />
+                        <Text style={styles.addButtonText}>Add</Text>
+                    </Pressable>
+                }
+            />
 
             <FilterToggle value={typeFilter} onChange={setTypeFilter} styles={styles} />
 
@@ -165,7 +193,7 @@ export default function AssetListScreen() {
                     <EmptyState typeFilter={typeFilter} onAdd={goToNew} styles={styles} />
                 }
             />
-        </View>
+        </Screen>
     );
 }
 
@@ -198,10 +226,13 @@ function createStyles(theme: Theme) {
             color: theme.body,
         },
         addButton: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
             backgroundColor: theme.primary,
-            borderRadius: 8,
-            paddingHorizontal: 16,
-            paddingVertical: 10,
+            borderRadius: 12,
+            paddingHorizontal: 14,
+            paddingVertical: 9,
         },
         addButtonText: {
             color: theme.onPrimary,
@@ -296,6 +327,17 @@ function createStyles(theme: Theme) {
             backgroundColor: theme.cardBackground,
             borderWidth: 1,
             borderColor: theme.border,
+        },
+        cardPaused: {
+            opacity: 0.55,
+        },
+        badgePaused: {
+            backgroundColor: theme.backgroundElement,
+            borderWidth: 1,
+            borderColor: theme.border,
+        },
+        badgePausedText: {
+            color: theme.textMuted,
         },
         typeBadgeText: {
             fontSize: 11,

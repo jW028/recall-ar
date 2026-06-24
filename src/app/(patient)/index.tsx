@@ -1,11 +1,13 @@
+import { Screen } from '@/components/common/Screen';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { LocationService } from '@/services/LocationService';
 import { PairingService } from '@/services/PairingService';
-import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
+import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 export default function PatientHomeScreen() {
     const theme = useTheme();
@@ -62,106 +64,126 @@ export default function PatientHomeScreen() {
     };
 
     return (
-        <View style={styles.container}>
-            <View style={styles.content}>
+        <Screen topInset>
+            <ScrollView contentContainerStyle={styles.content}>
                 <Text style={styles.title}>RecallAR</Text>
-                <Text style={styles.subtitle}>Point the camera at a face or object to identify it.</Text>
+                <Text style={styles.subtitle}>
+                    Point the camera at a face or object to identify it, or review your memories.
+                </Text>
 
                 <Pressable
-                    style={styles.arButton}
+                    style={({ pressed }) => [styles.actionCard, styles.primaryCard, pressed && styles.pressed]}
                     onPress={() => router.push('/(patient)/ar-view')}
                 >
-                    <Text style={styles.arButtonText}>Start AR</Text>
+                    <View style={[styles.iconBadge, styles.primaryBadge]}>
+                        <Ionicons name="scan" size={32} color={theme.onPrimary} />
+                    </View>
+                    <Text style={[styles.actionTitle, styles.primaryTitle]}>Start AR</Text>
+                    <Text style={[styles.actionBody, styles.primaryBody]}>
+                        Identify people and objects around you
+                    </Text>
                 </Pressable>
 
                 <Pressable
-                    style={styles.reviewButton}
+                    style={({ pressed }) => [styles.actionCard, styles.secondaryCard, pressed && styles.pressed]}
                     onPress={() => router.push('/(patient)/training')}
                 >
-                    <Text style={styles.reviewButtonText}>Daily review</Text>
+                    <View style={[styles.iconBadge, styles.secondaryBadge]}>
+                        <Ionicons name="school" size={32} color={theme.primary} />
+                    </View>
+                    <Text style={styles.actionTitle}>Daily review</Text>
+                    <Text style={styles.actionBody}>Practice remembering your people and things</Text>
                 </Pressable>
-            </View>
+            </ScrollView>
 
             <Pressable
                 style={styles.signOutButton}
                 onPress={handleSignOut}
                 disabled={isSigningOut}
+                hitSlop={8}
             >
                 <Text style={styles.signOutText}>
-                    {isSigningOut ? 'Signing out…' : 'Sign out'}
+                    {isSigningOut ? 'Signing out…' : 'Unpair this device'}
                 </Text>
             </Pressable>
-        </View>
+        </Screen>
     );
 }
 
 function createStyles(theme: Theme) {
     return StyleSheet.create({
-        container: {
-            flex: 1,
-            backgroundColor: theme.surface,
-        },
         content: {
-            flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-            paddingHorizontal: 32,
+            paddingHorizontal: 24,
+            paddingTop: 24,
+            paddingBottom: 16,
             gap: 16,
         },
         title: {
             fontSize: 36,
             fontWeight: '800',
-            color: theme.body,
-            marginBottom: 4,
+            color: theme.heading,
         },
         subtitle: {
             fontSize: 16,
             color: theme.textMuted,
-            textAlign: 'center',
             lineHeight: 22,
-            marginBottom: 16,
+            marginBottom: 8,
         },
-        arButton: {
+        actionCard: {
+            borderRadius: 20,
+            padding: 24,
+            gap: 8,
+        },
+        pressed: {
+            opacity: 0.9,
+        },
+        primaryCard: {
             backgroundColor: theme.primary,
-            borderRadius: 14,
-            paddingVertical: 18,
-            paddingHorizontal: 48,
-            alignItems: 'center',
         },
-        arButtonText: {
-            color: theme.onPrimary,
-            fontSize: 18,
-            fontWeight: '700',
-        },
-        reviewButton: {
-            borderRadius: 14,
-            paddingVertical: 18,
-            paddingHorizontal: 48,
-            alignItems: 'center',
+        secondaryCard: {
+            backgroundColor: theme.cardBackground,
             borderWidth: 1,
-            borderColor: theme.primary,
+            borderColor: theme.border,
+        },
+        iconBadge: {
+            width: 60,
+            height: 60,
+            borderRadius: 18,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: 8,
+        },
+        primaryBadge: {
+            backgroundColor: 'rgba(255,255,255,0.18)',
+        },
+        secondaryBadge: {
             backgroundColor: theme.primarySoft,
         },
-        reviewButtonText: {
-            color: theme.primaryText,
-            fontSize: 18,
+        actionTitle: {
+            fontSize: 22,
             fontWeight: '700',
+            color: theme.heading,
+        },
+        primaryTitle: {
+            color: theme.onPrimary,
+        },
+        actionBody: {
+            fontSize: 15,
+            color: theme.textMuted,
+            lineHeight: 20,
+        },
+        primaryBody: {
+            color: 'rgba(255,255,255,0.85)',
         },
         signOutButton: {
-            position: 'absolute',
-            bottom: 40,
             alignSelf: 'center',
             paddingVertical: 12,
-            paddingHorizontal: 32,
-            borderRadius: 10,
-            borderWidth: 1,
-            borderColor: theme.errorBorder,
-            backgroundColor: theme.errorBackground,
+            paddingHorizontal: 24,
         },
         signOutText: {
-            fontSize: 15,
+            fontSize: 14,
             fontWeight: '600',
-            color: theme.error,
+            color: theme.textMuted,
         },
     });
 }
