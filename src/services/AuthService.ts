@@ -44,13 +44,39 @@ async function resolveAuthUser(user: User): Promise<AuthUser | null> {
             .eq('caregiver_id', user.id)
             .single();
 
-        if (error || !data) return null;
+        // Profile found — return it
+        if (!error && data) {
+            return {
+                id: user.id,
+                email: user.email ?? '',
+                role: 'caregiver',
+                fullName: data.full_name,
+            };
+        }
+
+        // Profile missing — this happens when email confirmation is enabled and
+        // the signup flow skipped the insert. Create the row now using the
+        // metadata stored in Supabase Auth at registration time.
+        const fullName: string = user.user_metadata?.full_name ?? '';
+        const contact: string = user.user_metadata?.contact ?? '';
+
+        const { error: insertError } = await supabase.from('Caregiver').upsert({
+            caregiver_id: user.id,
+            full_name: fullName,
+            email: (user.email ?? '').trim().toLowerCase(),
+            caregiver_contact: contact,
+        }, { onConflict: 'caregiver_id', ignoreDuplicates: true });
+
+        if (insertError) {
+            console.error('[Auth] Failed to create Caregiver profile on first sign-in:', insertError.message);
+            return null;
+        }
 
         return {
             id: user.id,
             email: user.email ?? '',
             role: 'caregiver',
-            fullName: data.full_name,
+            fullName,
         };
     }
 

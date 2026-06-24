@@ -7,12 +7,13 @@ import { MIGRATION_V2_DEVICE_PAIRING } from './migrations/v2_device_pairing';
 import { MIGRATION_V3_ASSET_PHOTO_POOL } from './migrations/v3_asset_photo_pool';
 import { MIGRATION_V4_SYNC_STATE } from './migrations/v4_sync_state';
 import { MIGRATION_V5_TRAINING_LATENCY } from './migrations/v5_training_latency';
+import { MIGRATION_V6_UPDATE_THREAT } from './migrations/v6_update_threat';
 import { CREATE_TABLES } from './schema';
 
 const DATABASE_NAME = 'recallar.db';
 
 // Bump this number when a new migration is added in the MIGRATIONS array
-const LATEST_VERSION = 5;
+const LATEST_VERSION = 6;
 
 
 interface Migration {
@@ -28,24 +29,29 @@ const MIGRATIONS: Migration[] = [
         sql: CREATE_TABLES,
     },
     {
-      version: 2,
-      description: 'Add DevicePairing table',
-      sql: MIGRATION_V2_DEVICE_PAIRING,
+        version: 2,
+        description: 'Add DevicePairing table',
+        sql: MIGRATION_V2_DEVICE_PAIRING,
     },
     {
-      version: 3,
-      description: 'Add photo_urls pool column to MemoryAsset',
-      sql: MIGRATION_V3_ASSET_PHOTO_POOL,
+        version: 3,
+        description: 'Add photo_urls pool column to MemoryAsset',
+        sql: MIGRATION_V3_ASSET_PHOTO_POOL,
     },
     {
-      version: 4,
-      description: 'Add SyncState watermark table for pull sync',
-      sql: MIGRATION_V4_SYNC_STATE,
+        version: 4,
+        description: 'Add SyncState watermark table for pull sync',
+        sql: MIGRATION_V4_SYNC_STATE,
     },
     {
-      version: 5,
-      description: 'Add response_latency_ms to TrainingSession',
-      sql: MIGRATION_V5_TRAINING_LATENCY,
+        version: 5,
+        description: 'Add response_latency_ms to TrainingSession',
+        sql: MIGRATION_V5_TRAINING_LATENCY,
+    },
+    {
+        version: 6,
+        description: 'Remove geoEvent_id and track_id from Threat table',
+        sql: MIGRATION_V6_UPDATE_THREAT,
     },
 ]
 
@@ -90,12 +96,12 @@ async function initDatabase(db: SQLiteDatabase): Promise<void> {
 // DB initialization UI
 function DatabaseLoadingFallback() {
     return (
-      <View style={styles.fallback}>
-        <ActivityIndicator size="large" />
-        <Text style={styles.fallbackText}>Loading...</Text>
-      </View>
+        <View style={styles.fallback}>
+            <ActivityIndicator size="large" />
+            <Text style={styles.fallbackText}>Loading...</Text>
+        </View>
     );
-  }
+}
 // DatabaseProvider
 interface DatabaseProviderProps {
     children: ReactNode;

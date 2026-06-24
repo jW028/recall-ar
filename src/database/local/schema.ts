@@ -135,16 +135,13 @@ export const CREATE_TABLES = `
     CREATE TABLE IF NOT EXISTS Threat (
         threat_id         TEXT PRIMARY KEY NOT NULL,       -- UUID
         patient_id        TEXT NOT NULL,
-        geoEvent_id       TEXT NOT NULL,
-        track_id          TEXT NOT NULL,
         threat_type       TEXT NOT NULL,
         detected_time     TEXT NOT NULL,                   -- ISO-8601 timestamp
         threat_status     TEXT NOT NULL,
         alert_status      TEXT NOT NULL,
         alert_time        TEXT NOT NULL,                   -- ISO-8601 timestamp
-        acknowledged_time TEXT,                            -- [4] nullable — may never be acknowledged
-        FOREIGN KEY (patient_id)   REFERENCES Patient(patient_id) ON DELETE CASCADE,
-        FOREIGN KEY (geoEvent_id)  REFERENCES GeofenceEvent(geoEvent_id) ON DELETE CASCADE
+        acknowledged_time TEXT,                            -- nullable — may never be acknowledged
+        FOREIGN KEY (patient_id) REFERENCES Patient(patient_id) ON DELETE CASCADE
     );
 
     -- ─────────────────────────────────────────
