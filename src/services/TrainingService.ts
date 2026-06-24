@@ -125,10 +125,11 @@ async function buildSessionQueue(
     const queueDate = dayOf(now);
 
     try {
-        // Due-ness is the live next_review check; onboarding items sort first.
+        // Due-ness is the live next_review check; onboarding items sort first. Paused assets are
+        // never queued regardless of next_review.
         const dueRows = await db.getAllAsync<{ asset_id: string; status: string }>(
             `SELECT asset_id, status FROM MemoryAsset
-            WHERE patient_id = ? AND next_review <= ?
+            WHERE patient_id = ? AND status != 'Paused' AND next_review <= ?
             ORDER BY (status = 'Onboarding') DESC, next_review ASC
             LIMIT ?`,
             [patientId, now, MAX_DAILY_QUESTIONS]
@@ -188,6 +189,8 @@ async function generateQuestion(
 }
 
 // Mastered when the latest 3 attempts are all correct and fall on 3 distinct days.
+// Reads TrainingSession only, which pausing never touches — so a pause suspends the streak (a gap),
+// it does not reset it. Do not add date-continuity filtering that a paused gap would violate.
 async function checkMastery(assetId: string): Promise<boolean> {
     const db = getDatabase();
     const recent = await db.getAllAsync<{ success: number; timestamp: string }>(

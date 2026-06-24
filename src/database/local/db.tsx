@@ -8,12 +8,13 @@ import { MIGRATION_V3_ASSET_PHOTO_POOL } from './migrations/v3_asset_photo_pool'
 import { MIGRATION_V4_SYNC_STATE } from './migrations/v4_sync_state';
 import { MIGRATION_V5_TRAINING_LATENCY } from './migrations/v5_training_latency';
 import { MIGRATION_V6_UPDATE_THREAT } from './migrations/v6_update_threat';
+import { MIGRATION_V7_ASSET_PAUSE } from './migrations/v7_asset_pause';
 import { CREATE_TABLES } from './schema';
 
 const DATABASE_NAME = 'recallar.db';
 
 // Bump this number when a new migration is added in the MIGRATIONS array
-const LATEST_VERSION = 6;
+const LATEST_VERSION = 7;
 
 
 interface Migration {
@@ -53,6 +54,11 @@ const MIGRATIONS: Migration[] = [
         description: 'Remove geoEvent_id and track_id from Threat table',
         sql: MIGRATION_V6_UPDATE_THREAT,
     },
+    {
+        version: 7,
+        description: "Allow 'Paused' status and add paused_from to MemoryAsset",
+        sql: MIGRATION_V7_ASSET_PAUSE,
+    },
 ]
 
 // Migration runner, called by SQLiteProvider's onInit
@@ -84,6 +90,13 @@ async function ensureColumns(db: SQLiteDatabase): Promise<void> {
     if (!cols.some((c) => c.name === 'response_latency_ms')) {
         console.log('[DB] Backfilling missing column TrainingSession.response_latency_ms');
         await db.execAsync(`ALTER TABLE TrainingSession ADD COLUMN response_latency_ms INTEGER;`);
+    }
+
+    // paused_from is added in v7; backfill the column on DBs that reached v7 before it was wired in.
+    const assetCols = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(MemoryAsset)`);
+    if (!assetCols.some((c) => c.name === 'paused_from')) {
+        console.log('[DB] Backfilling missing column MemoryAsset.paused_from');
+        await db.execAsync(`ALTER TABLE MemoryAsset ADD COLUMN paused_from TEXT;`);
     }
 }
 

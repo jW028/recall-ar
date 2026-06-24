@@ -1,3 +1,4 @@
+import { Button } from '@/components/common/Button';
 import { MAX_ENROLLMENT_PHOTOS, MIN_ENROLLMENT_PHOTOS } from '@/constants/config';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -37,6 +38,10 @@ export default function AssetDetailScreen() {
         updatePool,
         photoStep,
         setThumbnail,
+        pause,
+        resume,
+        isPausing,
+        pauseError,
         deleteAsset,
         isDeleting,
     } = useMemoryAssetDetailViewModel(assetId);
@@ -285,6 +290,24 @@ export default function AssetDetailScreen() {
                         </>
                     )}
                     <DetailRow label="Status" value={asset.status} styles={styles} />
+                </View>
+            )}
+
+            {/* Pause/resume training — reversible, kept separate from Edit and the destructive Delete */}
+            {!isEditing && (
+                <View style={styles.pauseSection}>
+                    <Button
+                        label={asset.status === 'Paused' ? 'Resume training' : 'Pause training'}
+                        variant="secondary"
+                        loading={isPausing}
+                        onPress={asset.status === 'Paused' ? resume : pause}
+                    />
+                    {asset.status === 'Paused' && (
+                        <Text style={styles.pauseHint}>
+                            This memory won't appear in training until resumed.
+                        </Text>
+                    )}
+                    {pauseError && <Text style={styles.errorText}>{pauseError}</Text>}
                 </View>
             )}
 
@@ -634,6 +657,8 @@ function createStyles(theme: Theme) {
         },
         saveButtonDisabled: { backgroundColor: theme.primaryDisabled },
         saveButtonText: { color: theme.onPrimary, fontSize: 15, fontWeight: '600' },
+        pauseSection: { marginBottom: 20, gap: 8 },
+        pauseHint: { fontSize: 13, color: theme.textMuted, lineHeight: 19, textAlign: 'center' },
         deleteButton: {
             paddingVertical: 16,
             alignItems: 'center',
