@@ -1,8 +1,10 @@
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { LocationService } from '@/services/LocationService';
 import { PairingService } from '@/services/PairingService';
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import * as Location from 'expo-location';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 export default function PatientHomeScreen() {
@@ -10,6 +12,48 @@ export default function PatientHomeScreen() {
     const styles = useMemo(() => createStyles(theme), [theme]);
     const router = useRouter();
     const [isSigningOut, setIsSigningOut] = useState(false);
+
+    // ── Publish GPS location every 30 s while app is open ──────────
+    useEffect(() => {
+        let intervalId: ReturnType<typeof setInterval> | null = null;
+        let cancelled = false;
+
+        (async () => {
+            // Get the patientId from the persisted pairing
+            const pairing = await PairingService.getPersistedPairing();
+            if (!pairing || cancelled) return;
+
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted' || cancelled) return;
+
+            const publish = async () => {
+                if (cancelled) return;
+                try {
+                    const loc = await Location.getCurrentPositionAsync({
+                        accuracy: Location.Accuracy.Balanced,
+                    });
+                    await LocationService.publishLocation(pairing.patientId, {
+                        latitude: loc.coords.latitude,
+                        longitude: loc.coords.longitude,
+                        accuracy: loc.coords.accuracy,
+                    });
+                    // Prune table to keep last 10 entries only
+                    LocationService.pruneOldLocations(pairing.patientId);
+                } catch (e) {
+                    console.warn('[PatientHome] GPS publish error:', e);
+                }
+            };
+
+            // Publish immediately, then every 30 s
+            publish();
+            intervalId = setInterval(publish, 30_000);
+        })();
+
+        return () => {
+            cancelled = true;
+            if (intervalId !== null) clearInterval(intervalId);
+        };
+    }, []);
 
     const handleSignOut = async () => {
         setIsSigningOut(true);

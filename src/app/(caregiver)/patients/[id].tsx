@@ -226,6 +226,21 @@ export default function PatientDetailScreen() {
             </Pressable>
 
             <Pressable
+            style={styles.pairButton}
+            onPress={() => router.push(`/(caregiver)/patients/${id}/geofences`)}
+            >
+            <Text style={styles.pairButtonText}>🗺️ Manage Geofences</Text>
+            </Pressable>
+
+            <Pressable
+            style={styles.pairButton}
+            onPress={() => router.push(`/(caregiver)/patients/${id}/threats`)}
+            >
+            <Text style={styles.pairButtonText}>⚠️ View Threats</Text>
+            </Pressable>
+
+
+            <Pressable
             style={styles.deleteButton}
             onPress={handleDelete}
             disabled={isDeleting}

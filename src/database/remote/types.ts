@@ -349,6 +349,41 @@ export type Database = {
           },
         ]
       }
+      PatientLocation: {
+        Row: {
+          location_id: string
+          patient_id: string
+          latitude: number
+          longitude: number
+          accuracy: number | null
+          recorded_at: string
+        }
+        Insert: {
+          location_id?: string
+          patient_id: string
+          latitude: number
+          longitude: number
+          accuracy?: number | null
+          recorded_at?: string
+        }
+        Update: {
+          location_id?: string
+          patient_id?: string
+          latitude?: number
+          longitude?: number
+          accuracy?: number | null
+          recorded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "PatientLocation_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "Patient"
+            referencedColumns: ["patient_id"]
+          },
+        ]
+      }
       Patient: {
         Row: {
           caregiver_id: string
@@ -396,45 +431,32 @@ export type Database = {
           alert_status: string
           alert_time: string
           detected_time: string
-          geoevent_id: string
           patient_id: string
           threat_id: string
           threat_status: string
           threat_type: string
-          track_id: string
         }
         Insert: {
           acknowledged_time?: string | null
           alert_status: string
           alert_time: string
           detected_time: string
-          geoevent_id: string
           patient_id: string
           threat_id?: string
           threat_status: string
           threat_type: string
-          track_id: string
         }
         Update: {
           acknowledged_time?: string | null
           alert_status?: string
           alert_time?: string
           detected_time?: string
-          geoevent_id?: string
           patient_id?: string
           threat_id?: string
           threat_status?: string
           threat_type?: string
-          track_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "Threat_geoevent_id_fkey"
-            columns: ["geoevent_id"]
-            isOneToOne: false
-            referencedRelation: "GeofenceEvent"
-            referencedColumns: ["geoevent_id"]
-          },
           {
             foreignKeyName: "Threat_patient_id_fkey"
             columns: ["patient_id"]

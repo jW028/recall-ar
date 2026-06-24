@@ -10,7 +10,8 @@
     "ios": {
       "icon": "./assets/expo.icon",
       "infoPlist": {
-        "NSCameraUsageDescription": "RecallAR uses the camera to recognize faces and objects to assist memory."
+        "NSCameraUsageDescription": "RecallAR uses the camera to recognize faces and objects to assist memory.",
+        "NSLocationWhenInUseUsageDescription": "RecallAR uses your location to set the patient's safe zone centre."
       },
       "bundleIdentifier": "com.jwtan05.recallar-v2"
     },
@@ -21,11 +22,25 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "permissions": [
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDbXEPGREuH_EBrlS09mufJlotJ4JtHsKw"
+        }
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.yujie59.recallarv2"
     },
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
+    },
+    "updates": {
+      "enabled": false,
+      "checkAutomatically": "NEVER"
     },
     "plugins": [
       "expo-router",
@@ -57,9 +72,8 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "9e72c28d-a0b1-4154-9458-4d40509b82bc"
+        "projectId": "5e39545d-dca4-432b-95e4-9b649736782b"
       }
-    },
-    "owner": "jwtan05"
+    }
   }
 }
