@@ -38,6 +38,11 @@ interface UseMemoryAssetListViewModel {
     refresh: () => Promise<void>;
     typeFilter: TypeFilter;
     setTypeFilter: (filter: TypeFilter) => void;
+    // Active pool count (Onboarding + Maintenance); paused assets excluded, matching the cap rule.
+    activeCount: number;
+    pause: (assetId: string) => Promise<boolean>;
+    resume: (assetId: string) => Promise<boolean>;
+    pendingId: string | null; // asset currently pausing/resuming, for a per-row spinner
 }
 
 export function useMemoryAssetListViewModel(
@@ -47,6 +52,7 @@ export function useMemoryAssetListViewModel(
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+    const [pendingId, setPendingId] = useState<string | null>(null);
 
     const refresh = useCallback(async () => {
         if (!patientId) return;
@@ -65,12 +71,55 @@ export function useMemoryAssetListViewModel(
         refresh();
     }, [refresh]);
 
+    const pause = useCallback(async (assetId: string): Promise<boolean> => {
+        setPendingId(assetId);
+        setError(null);
+        const result = await MemoryAssetService.pauseAsset(assetId);
+        setPendingId(null);
+        if (result.error) {
+            setError(result.error);
+            return false;
+        }
+        await refresh();
+        return true;
+    }, [refresh]);
+
+    const resume = useCallback(async (assetId: string): Promise<boolean> => {
+        setPendingId(assetId);
+        setError(null);
+        const result = await MemoryAssetService.resumeAsset(assetId);
+        setPendingId(null);
+        if (result.error) {
+            setError(result.error);
+            return false;
+        }
+        await refresh();
+        return true;
+    }, [refresh]);
+
     const filteredAssets = useMemo(() => {
         if (typeFilter === 'all') return assets;
         return assets.filter((a) => a.type === typeFilter);
     }, [assets, typeFilter]);
 
-    return { assets, filteredAssets, isLoading, error, refresh, typeFilter, setTypeFilter };
+    const activeCount = useMemo(
+        () => assets.filter((a) => a.status === 'Onboarding' || a.status === 'Maintenance').length,
+        [assets]
+    );
+
+    return {
+        assets,
+        filteredAssets,
+        isLoading,
+        error,
+        refresh,
+        typeFilter,
+        setTypeFilter,
+        activeCount,
+        pause,
+        resume,
+        pendingId,
+    };
 }
 
 // Detail
@@ -92,6 +141,12 @@ interface UseMemoryAssetDetailViewModel {
     // Thumbnail selection: repoints the display image at an existing pool photo. No upload or embedding change, so it works offline.
     setThumbnail: (thumbnailUrl: string) => Promise<boolean>;
 
+    // Pause/resume training: freezes scheduling state and removes the asset from the daily queue until resumed.
+    pause: () => Promise<boolean>;
+    resume: () => Promise<boolean>;
+    isPausing: boolean;
+    pauseError: string | null;
+
     deleteAsset: () => Promise<boolean>;
     isDeleting: boolean;
     deleteError: string | null;
@@ -108,6 +163,9 @@ export function useMemoryAssetDetailViewModel(
     const [updateError, setUpdateError] = useState<string | null>(null);
 
     const [photoStep, setPhotoStep] = useState<'idle' | 'processing' | 'saving'>('idle');
+
+    const [isPausing, setIsPausing] = useState(false);
+    const [pauseError, setPauseError] = useState<string | null>(null);
 
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -198,6 +256,36 @@ export function useMemoryAssetDetailViewModel(
         [assetId]
     );
 
+    const pause = useCallback(async (): Promise<boolean> => {
+        if (!assetId) return false;
+        setIsPausing(true);
+        setPauseError(null);
+        const result = await MemoryAssetService.pauseAsset(assetId);
+        if (result.error || !result.data) {
+            setPauseError(result.error ?? 'Failed to pause training.');
+            setIsPausing(false);
+            return false;
+        }
+        setAsset(result.data);
+        setIsPausing(false);
+        return true;
+    }, [assetId]);
+
+    const resume = useCallback(async (): Promise<boolean> => {
+        if (!assetId) return false;
+        setIsPausing(true);
+        setPauseError(null);
+        const result = await MemoryAssetService.resumeAsset(assetId);
+        if (result.error || !result.data) {
+            setPauseError(result.error ?? 'Failed to resume training.');
+            setIsPausing(false);
+            return false;
+        }
+        setAsset(result.data);
+        setIsPausing(false);
+        return true;
+    }, [assetId]);
+
     const deleteAsset = useCallback(async (): Promise<boolean> => {
         if (!assetId) return false;
         setIsDeleting(true);
@@ -226,6 +314,10 @@ export function useMemoryAssetDetailViewModel(
         updatePool,
         photoStep,
         setThumbnail,
+        pause,
+        resume,
+        isPausing,
+        pauseError,
         deleteAsset,
         isDeleting,
         deleteError,

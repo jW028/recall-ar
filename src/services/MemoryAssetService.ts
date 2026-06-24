@@ -66,6 +66,7 @@ function mapRowToAsset(row: any): MemoryAsset {
         patientId: row.patient_id,
         name: row.name,
         status: row.status,
+        pausedFrom: row.paused_from ?? null,
         imageUrl: row.image_url,
         // Assets created before the photo-pool column existed have no pool — fall back to a single-photo pool of the display image so the UI stays uniform.
         photoUrls: row.photo_urls ? JSON.parse(row.photo_urls) : [row.image_url],
@@ -129,6 +130,7 @@ function validateEmbedding(embedding: number[]): string | null {
 }
 
 // UC02 cap enforcement: every asset in Onboarding/Maintenance is in the active pool. Blocks a new enrollment once the patient is already at the cap.
+// Paused assets are intentionally excluded — pausing is how a caregiver frees a pool slot without deleting.
 async function assertPoolCapacity(patientId: string): Promise<string | null> {
     const db = getDatabase();
     const row = await db.getFirstAsync<{ count: number }>(
@@ -266,6 +268,7 @@ async function createPerson(
         name: params.name.trim(),
         type: 'Person',
         status: 'Onboarding',
+        pausedFrom: null,
         imageUrl,
         photoUrls,
         embedding: params.embedding,
@@ -351,6 +354,7 @@ async function createObject(
         name: params.name.trim(),
         type: 'Object',
         status: 'Onboarding',
+        pausedFrom: null,
         imageUrl,
         photoUrls,
         embedding: params.embedding,
@@ -577,6 +581,48 @@ async function setThumbnail(
     return getAssetById(assetId);
 }
 
+// Pause / resume training for an asset. Pausing freezes scheduling state (interval, review_count,
+// next_review) and only removes the asset from the daily queue and the pool cap. paused_from records
+// the pre-pause status so resume restores Onboarding vs Maintenance correctly.
+async function pauseAsset(assetId: string): Promise<ServiceResult<MemoryAsset>> {
+    const db = getDatabase();
+    const now = new Date().toISOString();
+
+    try {
+        await db.runAsync(
+            `UPDATE MemoryAsset SET paused_from = status, status = 'Paused', updated_at = ?
+            WHERE asset_id = ? AND status != 'Paused'`,
+            [now, assetId]
+        );
+    } catch {
+        return { data: null, error: 'Failed to pause training. Please try again.' };
+    }
+
+    await queueSync(assetId, 'UPDATE');
+
+    return getAssetById(assetId);
+}
+
+async function resumeAsset(assetId: string): Promise<ServiceResult<MemoryAsset>> {
+    const db = getDatabase();
+    const now = new Date().toISOString();
+
+    try {
+        // Falls back to Maintenance if paused_from is somehow null.
+        await db.runAsync(
+            `UPDATE MemoryAsset SET status = COALESCE(paused_from, 'Maintenance'), paused_from = NULL,
+            updated_at = ? WHERE asset_id = ? AND status = 'Paused'`,
+            [now, assetId]
+        );
+    } catch {
+        return { data: null, error: 'Failed to resume training. Please try again.' };
+    }
+
+    await queueSync(assetId, 'UPDATE');
+
+    return getAssetById(assetId);
+}
+
 // Delete memory asset
 async function deleteAsset(assetId: string): Promise<ServiceResult> {
   const db = getDatabase();
@@ -602,5 +648,7 @@ export const MemoryAssetService = {
   updateAsset,
   updateAssetPool,
   setThumbnail,
+  pauseAsset,
+  resumeAsset,
   deleteAsset,
 };

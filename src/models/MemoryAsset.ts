@@ -1,11 +1,12 @@
 export type MemoryAssetType = 'Person' | 'Object';
-export type MemoryAssetStatus = 'Onboarding' | 'Maintenance';
+export type MemoryAssetStatus = 'Onboarding' | 'Maintenance' | 'Paused';
 
 interface MemoryAssetBase {
     assetId: string;
     patientId: string;
     name: string;
     status: MemoryAssetStatus;
+    pausedFrom: 'Onboarding' | 'Maintenance' | null; // status to restore on resume; null unless Paused
     imageUrl: string; // the chosen thumbnail; always one of photoUrls
     photoUrls: string[]; // pool of reference photos (public URLs); imageUrl ∈ photoUrls
     embedding: number[]; // length must equal EMBEDDING_DIM, averaged over photoUrls

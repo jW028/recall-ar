@@ -89,6 +89,7 @@ export const syncTableConfig: Record<SyncableTable, SyncTableConfig> = {
             name: row.name,
             type: row.type,
             status: row.status,
+            paused_from: row.paused_from,
             image_url: row.image_url,
             // SQLite stores the photo pool as a JSON string; Supabase expects a jsonb array, so it must be parsed before upserting. Null for assets created before the photo-pool migration.
             photo_urls: row.photo_urls ? JSON.parse(row.photo_urls as string) : null,
@@ -114,6 +115,7 @@ export const syncTableConfig: Record<SyncableTable, SyncTableConfig> = {
                 name: remote.name,
                 type: remote.type,
                 status: remote.status,
+                paused_from: remote.paused_from,
                 image_url: remote.image_url,
                 // Supabase returns the pgvector as a "[...]" string and photo_urls as a jsonb array; SQLite stores both as JSON TEXT, mirroring how toSupabaseRow parses them back out on push.
                 embedding:
