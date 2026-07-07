@@ -1,5 +1,11 @@
 import { Button } from '@/components/common/Button';
-import { MAX_ENROLLMENT_PHOTOS, MIN_ENROLLMENT_PHOTOS } from '@/constants/config';
+import { SuggestionChips } from '@/components/common/SuggestionChips';
+import {
+    MAX_ENROLLMENT_PHOTOS,
+    MIN_ENROLLMENT_PHOTOS,
+    OBJECT_CATEGORY_SUGGESTIONS,
+    RELATIONSHIP_SUGGESTIONS,
+} from '@/constants/config';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
@@ -420,6 +426,11 @@ export default function AssetDetailScreen() {
                             </View>
                             <View style={styles.field}>
                                 <Text style={styles.label}>Relationship</Text>
+                                <SuggestionChips
+                                    suggestions={RELATIONSHIP_SUGGESTIONS}
+                                    value={relationship}
+                                    onSelect={handleChange(setRelationship)}
+                                />
                                 <TextInput
                                     style={styles.input}
                                     value={relationship}
@@ -433,6 +444,11 @@ export default function AssetDetailScreen() {
                         <>
                             <View style={styles.field}>
                                 <Text style={styles.label}>Category</Text>
+                                <SuggestionChips
+                                    suggestions={OBJECT_CATEGORY_SUGGESTIONS}
+                                    value={category}
+                                    onSelect={handleChange(setCategory)}
+                                />
                                 <TextInput
                                     style={styles.input}
                                     value={category}
