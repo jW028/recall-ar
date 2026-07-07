@@ -1,12 +1,15 @@
 import {
     MAX_ENROLLMENT_PHOTOS,
     MIN_ENROLLMENT_PHOTOS,
+    OBJECT_CATEGORY_SUGGESTIONS,
+    RELATIONSHIP_SUGGESTIONS,
 } from '@/constants/config';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { validate } from '@/utils/validation';
 import { FormField } from '@/components/common/FormField';
+import { SuggestionField } from '@/components/common/SuggestionField';
 import { useCurrentPatientId } from '@/store/currentPatientStore';
 import { useEnrollmentViewModel } from '@/viewmodels/useMemoryAssetViewModel';
 import * as ImagePicker from 'expo-image-picker';
@@ -253,8 +256,9 @@ export default function NewAssetScreen() {
                             placeholder="YYYY-MM-DD"
                             keyboardType="numbers-and-punctuation"
                         />
-                        <FormField
+                        <SuggestionField
                             label="Relationship (optional)"
+                            suggestions={RELATIONSHIP_SUGGESTIONS}
                             value={relationship}
                             onChangeText={setRelationship}
                             placeholder="e.g. Daughter, Nurse"
@@ -264,8 +268,9 @@ export default function NewAssetScreen() {
 
                 {assetType === 'Object' && (
                     <>
-                        <FormField
+                        <SuggestionField
                             label="Category (optional)"
+                            suggestions={OBJECT_CATEGORY_SUGGESTIONS}
                             value={category}
                             onChangeText={setCategory}
                             placeholder="e.g. Keys, Medication"

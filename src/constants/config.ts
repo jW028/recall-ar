@@ -28,6 +28,14 @@ export const MAX_MEDICAL_NOTES_LENGTH = 2000;
 export const MIN_ENROLLMENT_PHOTOS = 3;
 export const MAX_ENROLLMENT_PHOTOS = 5;
 
+// Enrollment suggestions — chips the caregiver can tap; custom text is still allowed
+export const RELATIONSHIP_SUGGESTIONS = [
+    'Spouse', 'Son', 'Daughter', 'Grandchild', 'Sibling', 'Friend', 'Nurse', 'Caregiver',
+] as const;
+export const OBJECT_CATEGORY_SUGGESTIONS = [
+    'Keys', 'Medication', 'Glasses', 'Phone', 'Wallet', 'Remote', 'Documents',
+] as const;
+
 // Analytics (UC03/UC04)
 // These thresholds are clinical-ish judgement calls — start conservative and validate against real usage data, not guesses
 // Rolling-average window applied to raw daily values before trend analysis
