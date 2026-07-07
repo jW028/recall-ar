@@ -14,8 +14,8 @@ import { useAnalyticsViewModel } from '@/viewmodels/useAnalyticsViewModel';
 import { useMemoryAssetListViewModel } from '@/viewmodels/useMemoryAssetViewModel';
 import { usePatientListViewModel } from '@/viewmodels/usePatientViewModel';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useEffect, useMemo } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -50,8 +50,15 @@ export default function CaregiverHomeScreen() {
         [patients, currentPatientId]
     );
 
-    const { assets } = useMemoryAssetListViewModel(currentPatient?.patientId);
+    const { assets, refresh } = useMemoryAssetListViewModel(currentPatient?.patientId);
     const { dataset } = useAnalyticsViewModel(currentPatient?.patientId);
+
+    // Re-fetch counts when returning to this screen (e.g. after enrolling a memory) since the home stays mounted
+    useFocusEffect(
+        useCallback(() => {
+            refresh();
+        }, [refresh])
+    );
 
     const peopleCount = assets.filter(isPerson).length;
     const objectCount = assets.filter(isObject).length;
@@ -62,7 +69,8 @@ export default function CaregiverHomeScreen() {
         const ends = dataset.insufficientData ? null : smoothedEndpoints(dataset.accuracyByDay);
         if (!ends) return { value, delta: null };
         const pp = Math.round((ends.last - ends.first) * 100);
-        const delta = pp === 0 ? null : { text: `${Math.abs(pp)}% vs prior`, positive: pp > 0 };
+        // Higher accuracy is better, so an increase is both good (green) and an up arrow
+        const delta = pp === 0 ? null : { text: `${Math.abs(pp)}% vs prior`, positive: pp > 0, up: pp > 0 };
         return { value, delta };
     }, [dataset]);
 
@@ -72,10 +80,11 @@ export default function CaregiverHomeScreen() {
         const ends = dataset.insufficientData ? null : smoothedEndpoints(dataset.latencyByDay);
         if (!ends) return { value, delta: null };
         const diffSec = (ends.last - ends.first) / 1000;
+        // Lower latency is better, so a decrease is good (green) but points the arrow down to match the value
         const delta =
             Math.abs(diffSec) < 0.05
                 ? null
-                : { text: `${Math.abs(diffSec).toFixed(1)}s ${diffSec < 0 ? 'faster' : 'slower'}`, positive: diffSec < 0 };
+                : { text: `${Math.abs(diffSec).toFixed(1)}s ${diffSec < 0 ? 'faster' : 'slower'}`, positive: diffSec < 0, up: diffSec > 0 };
         return { value, delta };
     }, [dataset]);
 
