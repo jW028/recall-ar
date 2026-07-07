@@ -8,15 +8,15 @@ interface MetricTileProps {
     label: string;
     value: string;
     valueColor?: string;
-    // Optional delta caption with direction
-    delta?: { text: string; positive: boolean } | null;
+    // Optional delta caption: positive drives color (green good / red bad), up drives the arrow direction (actual value movement)
+    delta?: { text: string; positive: boolean; up: boolean } | null;
 }
 
 // Card showing a headline metric with an optional improving/declining delta
 export function MetricTile({ label, value, valueColor, delta }: MetricTileProps) {
     const theme = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
-    const deltaColor = delta?.positive ? theme.success : theme.warning;
+    const deltaColor = delta?.positive ? theme.success : theme.error;
 
     return (
         <View style={styles.tile}>
@@ -25,7 +25,7 @@ export function MetricTile({ label, value, valueColor, delta }: MetricTileProps)
             {delta && (
                 <View style={styles.deltaRow}>
                     <Ionicons
-                        name={delta.positive ? 'arrow-up' : 'arrow-down'}
+                        name={delta.up ? 'arrow-up' : 'arrow-down'}
                         size={13}
                         color={deltaColor}
                     />
