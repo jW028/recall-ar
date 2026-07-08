@@ -1,3 +1,4 @@
+import { ActionRow } from '@/components/caregiver/ActionRow';
 import { Button } from '@/components/common/Button';
 import { Screen } from '@/components/common/Screen';
 import { ScreenHeader } from '@/components/common/ScreenHeader';
@@ -7,12 +8,14 @@ import { AuthService } from '@/services/AuthService';
 import { useAuthStore } from '@/store/authStore';
 import { useThemeStore } from '@/store/themeStore';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 export default function AccountScreen() {
     const theme = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
+    const router = useRouter();
     const user = useAuthStore((s) => s.user);
     const clearAuth = useAuthStore((s) => s.clearAuth);
     const mode = useThemeStore((s) => s.mode);
@@ -53,6 +56,23 @@ export default function AccountScreen() {
                         />
                     </View>
                 </View>
+
+                <Text style={styles.sectionLabel}>Help & Legal</Text>
+                <ActionRow
+                    icon="help-circle-outline"
+                    label="User Guide & FAQ"
+                    onPress={() => router.push('/(caregiver)/home/user-guide')}
+                />
+                <ActionRow
+                    icon="shield-checkmark-outline"
+                    label="Privacy Declaration"
+                    onPress={() => router.push('/(caregiver)/home/privacy')}
+                />
+                <ActionRow
+                    icon="document-text-outline"
+                    label="Terms & Conditions"
+                    onPress={() => router.push('/(caregiver)/home/terms')}
+                />
 
                 <View style={styles.signOut}>
                     <Button label="Sign out" variant="destructive" icon="log-out-outline" onPress={handleSignOut} />
