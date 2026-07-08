@@ -15,7 +15,7 @@ import { useCurrentPatientId } from '@/store/currentPatientStore';
 import { useAnalyticsViewModel } from '@/viewmodels/useAnalyticsViewModel';
 import { useMemoryAssetListViewModel } from '@/viewmodels/useMemoryAssetViewModel';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 type TrainingTab = 'overview' | 'analytics';
 
@@ -41,7 +41,7 @@ export default function TrainingScreen() {
     return (
         <Screen>
             <ScreenHeader title="Training" />
-            <ScrollView contentContainerStyle={styles.container}>
+            <View style={styles.segmentBar}>
                 <View style={styles.segmentRow}>
                     {(['overview', 'analytics'] as const).map((value) => {
                         const active = value === tab;
@@ -58,13 +58,13 @@ export default function TrainingScreen() {
                         );
                     })}
                 </View>
+            </View>
 
-                {tab === 'overview' ? (
-                    <OverviewTab patientId={id} styles={styles} theme={theme} />
-                ) : (
-                    <AnalyticsTab patientId={id} styles={styles} theme={theme} />
-                )}
-            </ScrollView>
+            {tab === 'overview' ? (
+                <OverviewTab patientId={id} styles={styles} theme={theme} />
+            ) : (
+                <AnalyticsTab patientId={id} styles={styles} theme={theme} />
+            )}
         </Screen>
     );
 }
@@ -79,7 +79,7 @@ function OverviewTab({
     styles: ReturnType<typeof createStyles>;
     theme: Theme;
 }) {
-    const { assets, isLoading, error, activeCount, pause, resume, pendingId } =
+    const { assets, isLoading, error, activeCount, pause, resume, pendingId, refresh } =
         useMemoryAssetListViewModel(patientId);
 
     if (isLoading && assets.length === 0) {
@@ -91,7 +91,10 @@ function OverviewTab({
     }
 
     return (
-        <>
+        <ScrollView
+            contentContainerStyle={styles.container}
+            refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} />}
+        >
             <Text style={styles.poolCount}>
                 {activeCount} of {MAX_MONTHLY_POOL_SIZE} active
             </Text>
@@ -118,7 +121,7 @@ function OverviewTab({
                     />
                 ))
             )}
-        </>
+        </ScrollView>
     );
 }
 
@@ -173,6 +176,8 @@ function AnalyticsTab({
         dataset,
         timeframe,
         setTimeframe,
+        isRefreshing,
+        refresh,
         isExporting,
         exportError,
         exportMessage,
@@ -180,7 +185,10 @@ function AnalyticsTab({
     } = useAnalyticsViewModel(patientId);
 
     return (
-        <>
+        <ScrollView
+            contentContainerStyle={styles.container}
+            refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refresh} />}
+        >
             <TimeframeSelector value={timeframe} onChange={setTimeframe} />
 
             {status === 'loading' && (
@@ -229,7 +237,7 @@ function AnalyticsTab({
                     {exportError && <Text style={styles.exportErrorText}>{exportError}</Text>}
                 </>
             )}
-        </>
+        </ScrollView>
     );
 }
 
@@ -245,12 +253,17 @@ function createStyles(theme: Theme) {
             paddingVertical: 64,
             alignItems: 'center',
         },
+        segmentBar: {
+            paddingHorizontal: 24,
+            paddingTop: 8,
+            paddingBottom: 12,
+            backgroundColor: theme.surface,
+        },
         segmentRow: {
             flexDirection: 'row',
             backgroundColor: theme.backgroundElement,
             borderRadius: 10,
             padding: 4,
-            marginBottom: 20,
         },
         segment: {
             flex: 1,
