@@ -16,7 +16,7 @@ import { usePatientListViewModel } from '@/viewmodels/usePatientViewModel';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // First and last non-null smoothed values of a daily series, or null if too few
@@ -51,7 +51,25 @@ export default function CaregiverHomeScreen() {
     );
 
     const { assets, refresh } = useMemoryAssetListViewModel(currentPatient?.patientId);
-    const { dataset } = useAnalyticsViewModel(currentPatient?.patientId);
+    const { dataset, exportReport, isExporting, exportMessage, exportError, clearExportMessage } =
+        useAnalyticsViewModel(currentPatient?.patientId);
+
+    // Surface export result once, then clear so it doesn't fire again on re-render
+    useEffect(() => {
+        if (!exportMessage && !exportError) return;
+        Alert.alert(exportError ? 'Export failed' : 'Report exported', exportError ?? exportMessage ?? '');
+        clearExportMessage();
+    }, [exportMessage, exportError, clearExportMessage]);
+
+    // Export is an action, not navigation, so guard on data and in-flight state
+    const handleExport = useCallback(() => {
+        if (isExporting) return;
+        if (!dataset?.hasData) {
+            Alert.alert('No data yet', 'No training data to export yet.');
+            return;
+        }
+        exportReport();
+    }, [isExporting, dataset, exportReport]);
 
     // Re-fetch counts when returning to this screen (e.g. after enrolling a memory) since the home stays mounted
     useFocusEffect(
@@ -179,14 +197,19 @@ export default function CaregiverHomeScreen() {
                         onPress={() => router.push('/(caregiver)/memories/new')}
                     />
                     <ActionRow
-                        icon="images-outline"
-                        label="Manage Memories"
-                        onPress={() => router.push('/(caregiver)/memories')}
+                        icon="people-outline"
+                        label="Switch Patient"
+                        onPress={() => router.push('/(caregiver)/home/select-patient')}
                     />
                     <ActionRow
-                        icon="school-outline"
-                        label="Manage Training"
-                        onPress={() => router.push('/(caregiver)/training')}
+                        icon="phone-portrait-outline"
+                        label="Pair Device"
+                        onPress={() => router.push('/(caregiver)/home/pair-device')}
+                    />
+                    <ActionRow
+                        icon="document-text-outline"
+                        label="Export Medical Report"
+                        onPress={handleExport}
                     />
                 </View>
             </ScrollView>
