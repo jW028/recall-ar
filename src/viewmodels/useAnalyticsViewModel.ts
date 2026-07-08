@@ -14,6 +14,8 @@ interface UseAnalyticsViewModel {
     timeframe: AnalyticsTimeframe;
     setTimeframe: (timeframe: AnalyticsTimeframe) => void;
     refresh: () => Promise<void>;
+    // Pull-to-refresh reloads without flipping status to 'loading', so the dashboard stays visible under the spinner
+    isRefreshing: boolean;
     isExporting: boolean;
     exportError: string | null;
     exportMessage: string | null;
@@ -26,6 +28,7 @@ export function useAnalyticsViewModel(patientId: string | undefined): UseAnalyti
     const [error, setError] = useState<string | null>(null);
     const [dataset, setDataset] = useState<AnalyticsDataset | null>(null);
     const [timeframe, setTimeframeState] = useState<AnalyticsTimeframe>('30d');
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
     const [exportError, setExportError] = useState<string | null>(null);
     const [exportMessage, setExportMessage] = useState<string | null>(null);
@@ -40,13 +43,15 @@ export function useAnalyticsViewModel(patientId: string | undefined): UseAnalyti
     }, []);
 
     const load = useCallback(
-        async (tf: AnalyticsTimeframe) => {
+        async (tf: AnalyticsTimeframe, silent = false) => {
             if (!patientId) {
                 setError('Patient not found.');
                 setStatus('error');
                 return;
             }
-            setStatus('loading');
+            // Silent reloads keep the current dataset on screen; only the pull spinner signals activity
+            if (silent) setIsRefreshing(true);
+            else setStatus('loading');
             setError(null);
 
             // Patient (name + DOB) is needed for the exported report header
@@ -60,10 +65,12 @@ export function useAnalyticsViewModel(patientId: string | undefined): UseAnalyti
             if (result.error || !result.data) {
                 setError(result.error ?? 'Failed to load analytics.');
                 setStatus('error');
+                if (silent) setIsRefreshing(false);
                 return;
             }
             setDataset(result.data);
             setStatus(result.data.hasData ? 'ready' : 'empty');
+            if (silent) setIsRefreshing(false);
         },
         [patientId]
     );
@@ -76,7 +83,7 @@ export function useAnalyticsViewModel(patientId: string | undefined): UseAnalyti
         setTimeframeState(tf);
     }, []);
 
-    const refresh = useCallback(() => load(timeframe), [load, timeframe]);
+    const refresh = useCallback(() => load(timeframe, true), [load, timeframe]);
 
     const exportReport = useCallback(async () => {
         if (!dataset || !dataset.hasData || !patientRef.current) return;
@@ -105,6 +112,7 @@ export function useAnalyticsViewModel(patientId: string | undefined): UseAnalyti
         timeframe,
         setTimeframe,
         refresh,
+        isRefreshing,
         isExporting,
         exportError,
         exportMessage,
