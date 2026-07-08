@@ -1,6 +1,7 @@
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { PairingService } from '@/services/PairingService';
+import { useAuthStore } from '@/store/authStore';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
@@ -26,13 +27,17 @@ export default function PairDeviceScreen() {
   // Prevent processing multiple scans in quick succession
   const [hasScanned, setHasScanned] = useState(false);
   const [devToken, setDevToken] = useState('');
- 
+
+  const authStatus = useAuthStore((s) => s.status);
+  const authRole = useAuthStore((s) => s.user?.role);
+
   useEffect(() => {
-    // If the device is already paired, skip straight to the patient app
-    PairingService.getPersistedPairing().then((info) => {
-      if (info) router.replace('/(patient)');
-    });
-  }, []);
+    // Only skip setup when a live patient session exists; a stale SecureStore pairing
+    // with no valid session must NOT forward, or AuthGuard bounces it back to login
+    if (authStatus === 'authenticated' && authRole === 'patient') {
+      router.replace('/(patient)');
+    }
+  }, [authStatus, authRole, router]);
  
   const handleBarCodeScanned = async ({ data }: { data: string }) => {
     if (hasScanned) return;

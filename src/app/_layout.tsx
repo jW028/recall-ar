@@ -43,6 +43,10 @@ function AuthGuard() {
       const inCaregiverGroup = segments[0] === '(caregiver)';
       const inPatientGroup = segments[0] === '(patient)';
 
+      // Patient device setup must stay reachable regardless of who is signed in
+      const onPairScreen = segments[0] === '(auth)' && segments[1] === 'pair';
+      if (onPairScreen) return;
+
       if (status === 'unauthenticated') {
         // Not logged in and not paired - go to login
         if (!inAuthGroup) {
