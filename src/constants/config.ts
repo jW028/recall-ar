@@ -1,8 +1,25 @@
-// MobileFaceNet configured with a 512-dim embedding 
-export const EMBEDDING_DIM = 512;
+// People are embedded with MobileFaceNet (512-dim); objects with a MobileNetV2 feature extractor (1280-dim).
+// A face model cannot embed objects — measured on real frames it confused two key sets 5/5 times.
+export const FACE_EMBEDDING_DIM = 512;
+export const OBJECT_EMBEDDING_DIM = 1280;
 
-// Confidence Threshold for match accuracy
-export const CONFIDENCE_THRESHOLD = 0.55;
+// Identifies which model produced a stored embedding. Bump when a model changes so stale vectors are re-embedded rather than compared.
+export const FACE_EMBEDDING_MODEL = 'facenet_512';
+export const OBJECT_EMBEDDING_MODEL = 'mobilenet_v2_1280';
+
+// Confidence thresholds are per-model: cosine scores from different embedding spaces are not comparable.
+export const FACE_CONFIDENCE_THRESHOLD = 0.55;
+// Measured on real AR frames: an enrolled object in view scored 0.624-0.859 (n=12), a bare surface 0.273-0.288 (n=3).
+// Any value in (0.288, 0.624) separates them; 0.55 sits high in that window, biasing towards "Scanning" over a wrong label.
+export const OBJECT_CONFIDENCE_THRESHOLD = 0.55;
+
+// Two above-threshold matches within this cosine margin are treated as ambiguous.
+// Measured: correct matches beat the runner-up by 0.056-0.207, so this does not fire on a confident match.
+export const AMBIGUITY_MARGIN = 0.05;
+
+// Live AR frames are wide shots; enrollment photos are square close-ups. Centre-cropping the live frame to this
+// fraction closes that framing gap — measured to lift the worst-case true match from 0.470 to 0.624.
+export const AR_LIVE_CROP_FRACTION = 0.6;
 
 // Processing Latency threshold
 export const AR_LATENCY_BUDGET_MS = 500;

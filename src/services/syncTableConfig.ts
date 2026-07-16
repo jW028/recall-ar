@@ -95,6 +95,7 @@ export const syncTableConfig: Record<SyncableTable, SyncTableConfig> = {
             photo_urls: row.photo_urls ? JSON.parse(row.photo_urls as string) : null,
             // SQLite stores embedding as a JSON string; Supabase expects a pgvector-compatible array, so it must be parsed before upserting.
             embedding: JSON.parse(row.embedding as string),
+            embedding_model: row.embedding_model,
             notes: row.notes,
             current_interval_minutes: row.current_interval_minutes,
             next_review: row.next_review,
@@ -123,6 +124,7 @@ export const syncTableConfig: Record<SyncableTable, SyncTableConfig> = {
                         ? remote.embedding
                         : JSON.stringify(remote.embedding),
                 photo_urls: remote.photo_urls != null ? JSON.stringify(remote.photo_urls) : null,
+                embedding_model: remote.embedding_model,
                 notes: remote.notes,
                 current_interval_minutes: remote.current_interval_minutes,
                 next_review: remote.next_review,

@@ -22,6 +22,8 @@ export default function ARViewScreen() {
         initError,
         result,
         photoOutput,
+        isCameraActive,
+        onCameraError,
     } = useARViewModel();
 
     // Screen is already inset above the tab bar; small gap is enough
@@ -39,13 +41,16 @@ export default function ARViewScreen() {
         );
     }
 
-    const overlayLabel = !isInitializing && !initError && result?.status === 'recognized'
-        ? result.label ?? null
-        : null;
+    const ready = !isInitializing && !initError;
+
+    const recognizedLabel = ready && result?.status === 'recognized' ? result.label ?? null : null;
+    // Ambiguous look-alikes show a shared category (e.g. "Keys") without asserting a specific item
+    const ambiguousLabel = ready && result?.status === 'ambiguous' ? result.label ?? null : null;
 
     const statusText = (() => {
         if (isInitializing) return null;
         if (initError) return null;
+        if (!isCameraActive) return 'Reconnecting camera…';
         if (!result || result.status === 'scanning') return 'Scanning…';
         if (result.status === 'unknown') return 'No match found';
         return null;
@@ -57,8 +62,9 @@ export default function ARViewScreen() {
                 <Camera
                     style={StyleSheet.absoluteFill}
                     device={device}
-                    isActive={!isInitializing && !initError}
+                    isActive={ready && isCameraActive}
                     outputs={[photoOutput]}
+                    onError={onCameraError}
                 />
             )}
 
@@ -76,11 +82,22 @@ export default function ARViewScreen() {
                 </View>
             )}
 
-            {!isInitializing && !initError && (
+            {/* Recognition only looks at the centre of the frame, so show the patient where to aim */}
+            {ready && (
+                <View style={styles.guideBox} pointerEvents="none">
+                    <Text style={styles.guideHint}>Point at the object</Text>
+                </View>
+            )}
+
+            {ready && (
                 <View style={[styles.resultContainer, { bottom: overlayBottom }]}>
-                    {overlayLabel ? (
+                    {recognizedLabel ? (
                         <View style={styles.recognizedCard}>
-                            <Text style={styles.recognizedLabel}>{overlayLabel}</Text>
+                            <Text style={styles.recognizedLabel}>{recognizedLabel}</Text>
+                        </View>
+                    ) : ambiguousLabel ? (
+                        <View style={styles.ambiguousCard}>
+                            <Text style={styles.ambiguousLabel}>{ambiguousLabel}</Text>
                         </View>
                     ) : statusText ? (
                         <View style={styles.statusCard}>
@@ -165,6 +182,40 @@ function createStyles(theme: Theme) {
             fontSize: 22,
             fontWeight: '700',
             textAlign: 'center',
+        },
+        ambiguousCard: {
+            // Neutral (not the confident green) — the shared category without a specific claim
+            backgroundColor: theme.surface,
+            borderRadius: 16,
+            paddingVertical: 16,
+            paddingHorizontal: 28,
+        },
+        ambiguousLabel: {
+            color: theme.heading,
+            fontSize: 22,
+            fontWeight: '700',
+            textAlign: 'center',
+        },
+        guideBox: {
+            // Mirrors AR_LIVE_CROP_FRACTION: the region the object model actually sees
+            position: 'absolute',
+            left: '20%',
+            top: '20%',
+            width: '60%',
+            height: '60%',
+            borderWidth: 2,
+            borderColor: 'rgba(255,255,255,0.7)',
+            borderRadius: 20,
+            alignItems: 'center',
+            justifyContent: 'flex-start',
+        },
+        guideHint: {
+            color: 'rgba(255,255,255,0.9)',
+            fontSize: 15,
+            fontWeight: '600',
+            marginTop: -30,
+            textShadowColor: 'rgba(0,0,0,0.8)',
+            textShadowRadius: 4,
         },
         statusCard: {
             // Neutral scrim chip over the camera feed
