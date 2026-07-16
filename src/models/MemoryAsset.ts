@@ -9,7 +9,8 @@ interface MemoryAssetBase {
     pausedFrom: 'Onboarding' | 'Maintenance' | null; // status to restore on resume; null unless Paused
     imageUrl: string; // the chosen thumbnail; always one of photoUrls
     photoUrls: string[]; // pool of reference photos (public URLs); imageUrl ∈ photoUrls
-    embedding: number[]; // length must equal EMBEDDING_DIM, averaged over photoUrls
+    embedding: number[]; // averaged over photoUrls; length must match the type's model (see FACE/OBJECT_EMBEDDING_DIM)
+    embeddingModel: string | null; // model that produced `embedding`; stale values are re-embedded, never compared
     notes: string;
     currentIntervalMinutes: number;
     nextReview: string; // ISO-8601 timestamp

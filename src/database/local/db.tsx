@@ -9,12 +9,13 @@ import { MIGRATION_V4_SYNC_STATE } from './migrations/v4_sync_state';
 import { MIGRATION_V5_TRAINING_LATENCY } from './migrations/v5_training_latency';
 import { MIGRATION_V6_UPDATE_THREAT } from './migrations/v6_update_threat';
 import { MIGRATION_V7_ASSET_PAUSE } from './migrations/v7_asset_pause';
+import { MIGRATION_V8_EMBEDDING_MODEL } from './migrations/v8_embedding_model';
 import { CREATE_TABLES } from './schema';
 
 const DATABASE_NAME = 'recallar.db';
 
 // Bump this number when a new migration is added in the MIGRATIONS array
-const LATEST_VERSION = 7;
+const LATEST_VERSION = 8;
 
 
 interface Migration {
@@ -59,6 +60,11 @@ const MIGRATIONS: Migration[] = [
         description: "Allow 'Paused' status and add paused_from to MemoryAsset",
         sql: MIGRATION_V7_ASSET_PAUSE,
     },
+    {
+        version: 8,
+        description: 'Add embedding_model to MemoryAsset',
+        sql: MIGRATION_V8_EMBEDDING_MODEL,
+    },
 ]
 
 // Migration runner, called by SQLiteProvider's onInit
@@ -97,6 +103,12 @@ async function ensureColumns(db: SQLiteDatabase): Promise<void> {
     if (!assetCols.some((c) => c.name === 'paused_from')) {
         console.log('[DB] Backfilling missing column MemoryAsset.paused_from');
         await db.execAsync(`ALTER TABLE MemoryAsset ADD COLUMN paused_from TEXT;`);
+    }
+
+    // embedding_model is added in v8; backfill on DBs that reached v8 before it was wired in.
+    if (!assetCols.some((c) => c.name === 'embedding_model')) {
+        console.log('[DB] Backfilling missing column MemoryAsset.embedding_model');
+        await db.execAsync(`ALTER TABLE MemoryAsset ADD COLUMN embedding_model TEXT;`);
     }
 }
 

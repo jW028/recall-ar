@@ -36,7 +36,7 @@ export default function NewAssetScreen() {
     const styles = useMemo(() => createStyles(theme), [theme]);
     const { isOnline } = useNetworkStatus();
 
-    const { step, photoUris, addPhoto, removePhoto, canSubmit, submitPerson, submitObject, error } =
+    const { step, photoUris, addPhoto, removePhoto, canSubmit, submitPerson, submitObject, error, existingObjectCategories } =
         useEnrollmentViewModel(patientId);
 
     const [assetType, setAssetType] = useState<AssetType>('Person');
@@ -63,6 +63,12 @@ export default function NewAssetScreen() {
         setTouched(prev => ({ ...prev, [field]: true }));
 
     const isFormValid = !errors.name && !errors.dateOfBirth;
+
+    // Warn when a new object reuses an existing category — look-alikes the recognizer can't tell apart
+    const categoryCollision =
+        assetType === 'Object' &&
+        !!category.trim() &&
+        existingObjectCategories.includes(category.trim().toLowerCase());
 
     const isProcessing = step === 'processing' || step === 'saving';
     const submitLabel =
@@ -225,7 +231,7 @@ export default function NewAssetScreen() {
                     onChangeText={setName}
                     onBlur={touch('name')}
                     error={visibleError('name')}
-                    placeholder={assetType === 'Person' ? 'e.g. Grandma Mary' : 'e.g. House keys'}
+                    placeholder={assetType === 'Person' ? 'e.g. Grandma Mary' : 'e.g. House keys (red tag)'}
                     returnKeyType="next"
                 />
 
@@ -268,6 +274,13 @@ export default function NewAssetScreen() {
 
                 {assetType === 'Object' && (
                     <>
+                        <View style={categoryCollision ? styles.tipBoxWarn : styles.tipBox}>
+                            <Text style={categoryCollision ? styles.tipTextWarn : styles.tipText}>
+                                {categoryCollision
+                                    ? `You already have a "${category.trim()}" item. Make sure this one looks visibly different — add a distinct marker like a coloured tag or sticker and capture it in the photos — so RecallAR doesn't confuse them.`
+                                    : 'If this looks like another item you\'ve added (such as a second set of keys), add a distinct marker — a coloured tag or sticker — and make sure it shows in the photos.'}
+                            </Text>
+                        </View>
                         <SuggestionField
                             label="Category (optional)"
                             suggestions={OBJECT_CATEGORY_SUGGESTIONS}
@@ -328,6 +341,24 @@ function createStyles(theme: Theme) {
             marginBottom: 16,
         },
         errorText: { color: theme.error, fontSize: 14 },
+        tipBox: {
+            backgroundColor: theme.primarySoft,
+            borderColor: theme.primaryMutedBorder,
+            borderWidth: 1,
+            borderRadius: 8,
+            padding: 12,
+            marginBottom: 16,
+        },
+        tipText: { color: theme.primaryText, fontSize: 13, lineHeight: 19 },
+        tipBoxWarn: {
+            backgroundColor: theme.errorBackground,
+            borderColor: theme.errorBorder,
+            borderWidth: 1,
+            borderRadius: 8,
+            padding: 12,
+            marginBottom: 16,
+        },
+        tipTextWarn: { color: theme.error, fontSize: 13, lineHeight: 19 },
         typeToggle: { flexDirection: 'row', gap: 10, marginBottom: 20 },
         typeChip: {
             flex: 1,

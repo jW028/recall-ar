@@ -2,7 +2,7 @@ import {
     MAX_ENROLLMENT_PHOTOS,
     MIN_ENROLLMENT_PHOTOS,
 } from '@/constants/config';
-import type { MemoryAsset } from '@/models/MemoryAsset';
+import type { MemoryAsset, MemoryAssetType } from '@/models/MemoryAsset';
 import {
     MemoryAssetService,
     type CreateObjectParams,
@@ -11,18 +11,26 @@ import {
 } from '@/services/MemoryAssetService';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-// Runs the on-device face-embedding model over the given photos and returns the averaged embedding. Shared by enrollment and photo re-enrollment. Throws on failure so callers can surface a message.
-async function computeFaceEmbedding(uris: string[]): Promise<number[]> {
+// Runs the on-device embedding model for the given asset type over the photos and returns the averaged embedding.
+// People use the face model; objects use a general image-feature model — a face model cannot embed objects.
+// Shared by enrollment and photo re-enrollment. Throws on failure so callers can surface a message.
+async function computeEmbedding(type: MemoryAssetType, uris: string[]): Promise<number[]> {
     const { FaceEmbeddingModel } =
         require('@/ml/FaceEmbeddingModel') as typeof import('@/ml/FaceEmbeddingModel');
-    const { prepareImageTensor, averageEmbeddings } =
+    const { ObjectEmbeddingModel } =
+        require('@/ml/ObjectEmbeddingModel') as typeof import('@/ml/ObjectEmbeddingModel');
+    const { prepareImageTensor, averageEmbeddings, FACE_TENSOR, OBJECT_ENROLL_TENSOR } =
         require('@/ml/ImagePreprocessor') as typeof import('@/ml/ImagePreprocessor');
 
-    await FaceEmbeddingModel.loadModel();
+    const isPersonType = type === 'Person';
+    const model = isPersonType ? FaceEmbeddingModel : ObjectEmbeddingModel;
+    const spec = isPersonType ? FACE_TENSOR : OBJECT_ENROLL_TENSOR;
+
+    await model.loadModel();
     const embeddings: number[][] = [];
     for (const uri of uris) {
-        const tensor = await prepareImageTensor(uri);
-        embeddings.push(FaceEmbeddingModel.runInference(tensor));
+        const tensor = await prepareImageTensor(uri, spec);
+        embeddings.push(model.runInference(tensor));
     }
     return averageEmbeddings(embeddings);
 }
@@ -218,7 +226,11 @@ export function useMemoryAssetDetailViewModel(
             setPhotoStep('processing');
             try {
                 // The embedding is averaged over the whole pool, so re-run the model over the kept (remote) photos plus the new local ones.
-                const embedding = await computeFaceEmbedding([...keepUrls, ...newPhotoUris]);
+                if (!asset) {
+                    setUpdateError('Memory not loaded.');
+                    return false;
+                }
+                const embedding = await computeEmbedding(asset.type, [...keepUrls, ...newPhotoUris]);
                 setPhotoStep('saving');
                 const result = await MemoryAssetService.updateAssetPool(assetId, {
                     keepUrls,
@@ -238,7 +250,7 @@ export function useMemoryAssetDetailViewModel(
                 setPhotoStep('idle');
             }
         },
-        [assetId]
+        [assetId, asset]
     );
 
     const setThumbnail = useCallback(
@@ -340,6 +352,8 @@ interface UseEnrollmentViewModel {
         params: Omit<CreateObjectParams, 'photoUris' | 'embedding' | 'patientId'>
     ) => Promise<boolean>;
     error: string | null;
+    // Lowercased categories of objects already enrolled for this patient, for duplicate-category warnings
+    existingObjectCategories: string[];
 }
 
 export function useEnrollmentViewModel(
@@ -348,6 +362,24 @@ export function useEnrollmentViewModel(
     const [step, setStep] = useState<EnrollmentStep>('idle');
     const [photoUris, setPhotoUris] = useState<string[]>([]);
     const [error, setError] = useState<string | null>(null);
+    const [existingObjectCategories, setExistingObjectCategories] = useState<string[]>([]);
+
+    // Load existing object categories once so the form can warn about look-alike collisions
+    useEffect(() => {
+        if (!patientId) return;
+        let cancelled = false;
+        (async () => {
+            const result = await MemoryAssetService.getAssetsByPatient(patientId, 'Object');
+            if (cancelled || result.error || !result.data) return;
+            const categories = result.data
+                .map((a) => (a.type === 'Object' ? a.category?.trim().toLowerCase() : null))
+                .filter((c): c is string => !!c);
+            setExistingObjectCategories(Array.from(new Set(categories)));
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [patientId]);
 
     const canSubmit =
         photoUris.length >= MIN_ENROLLMENT_PHOTOS &&
@@ -364,10 +396,10 @@ export function useEnrollmentViewModel(
         setPhotoUris((prev) => prev.filter((u) => u !== uri));
     }, []);
 
-    async function generateEmbedding(uris: string[]): Promise<number[] | null> {
+    async function generateEmbedding(type: MemoryAssetType, uris: string[]): Promise<number[] | null> {
         setStep('processing');
         try {
-            return await computeFaceEmbedding(uris);
+            return await computeEmbedding(type, uris);
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to process photos.');
             setStep('idle');
@@ -382,7 +414,7 @@ export function useEnrollmentViewModel(
             if (!patientId || !canSubmit) return false;
             setError(null);
 
-            const embedding = await generateEmbedding(photoUris);
+            const embedding = await generateEmbedding('Person', photoUris);
             if (!embedding) return false;
 
             setStep('saving');
@@ -412,7 +444,7 @@ export function useEnrollmentViewModel(
             if (!patientId || !canSubmit) return false;
             setError(null);
 
-            const embedding = await generateEmbedding(photoUris);
+            const embedding = await generateEmbedding('Object', photoUris);
             if (!embedding) return false;
 
             setStep('saving');
@@ -435,5 +467,5 @@ export function useEnrollmentViewModel(
         [patientId, canSubmit, photoUris]
     );
 
-    return { step, photoUris, addPhoto, removePhoto, canSubmit, submitPerson, submitObject, error };
+    return { step, photoUris, addPhoto, removePhoto, canSubmit, submitPerson, submitObject, error, existingObjectCategories };
 }

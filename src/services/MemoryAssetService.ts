@@ -1,8 +1,11 @@
 import {
-    EMBEDDING_DIM,
+    FACE_EMBEDDING_DIM,
+    FACE_EMBEDDING_MODEL,
     MAX_ENROLLMENT_PHOTOS,
     MAX_MONTHLY_POOL_SIZE,
     MIN_ENROLLMENT_PHOTOS,
+    OBJECT_EMBEDDING_DIM,
+    OBJECT_EMBEDDING_MODEL,
 } from '@/constants/config';
 import { getDatabase } from '@/database/local/db';
 import { supabase } from '@/database/remote/supabaseClient';
@@ -10,6 +13,7 @@ import type {
     EnrolledObject,
     EnrolledPerson,
     MemoryAsset,
+    MemoryAssetType,
 } from '@/models/MemoryAsset';
 import * as Crypto from 'expo-crypto';
 import type { SQLiteBindValue } from 'expo-sqlite';
@@ -71,6 +75,7 @@ function mapRowToAsset(row: any): MemoryAsset {
         // Assets created before the photo-pool column existed have no pool — fall back to a single-photo pool of the display image so the UI stays uniform.
         photoUrls: row.photo_urls ? JSON.parse(row.photo_urls) : [row.image_url],
         embedding: JSON.parse(row.embedding),
+        embeddingModel: row.embedding_model ?? null,
         notes: row.notes,
         currentIntervalMinutes: row.current_interval_minutes,
         nextReview: row.next_review,
@@ -122,9 +127,16 @@ function validatePhotos(photoUris: string[]): string | null {
     return validatePhotoCount(photoUris.length);
 }
 
-function validateEmbedding(embedding: number[]): string | null {
-    if (embedding.length !== EMBEDDING_DIM) {
-        return `Embedding has invalid dimension (expected ${EMBEDDING_DIM}, got ${embedding.length})`;
+// The embedding model each asset type is currently enrolled with.
+export function modelFor(type: MemoryAssetType): string {
+    return type === 'Person' ? FACE_EMBEDDING_MODEL : OBJECT_EMBEDDING_MODEL;
+}
+
+// Dimension is per asset type — people and objects are embedded by different models.
+function validateEmbedding(type: MemoryAssetType, embedding: number[]): string | null {
+    const expected = type === 'Person' ? FACE_EMBEDDING_DIM : OBJECT_EMBEDDING_DIM;
+    if (embedding.length !== expected) {
+        return `Embedding has invalid dimension for ${type} (expected ${expected}, got ${embedding.length})`;
     }
     return null;
 }
@@ -209,7 +221,7 @@ async function createPerson(
     const photoError = validatePhotos(params.photoUris);
     if (photoError) return { data: null, error: photoError };
 
-    const embeddingError = validateEmbedding(params.embedding);
+    const embeddingError = validateEmbedding('Person', params.embedding);
     if (embeddingError) return { data: null, error: embeddingError };
 
     const capError = await assertPoolCapacity(params.patientId);
@@ -235,11 +247,11 @@ async function createPerson(
     try {
         await db.runAsync(
         `INSERT INTO MemoryAsset
-            (asset_id, patient_id, name, type, status, image_url, photo_urls, embedding, notes,
+            (asset_id, patient_id, name, type, status, image_url, photo_urls, embedding, embedding_model, notes,
             current_interval_minutes, next_review, review_count,
             date_of_birth, relationship, category, reminder_text,
             created_at, updated_at)
-        VALUES (?, ?, ?, 'Person', 'Onboarding', ?, ?, ?, ?, 1, ?, 0, ?, ?, NULL, NULL, ?, ?)`,
+        VALUES (?, ?, ?, 'Person', 'Onboarding', ?, ?, ?, ?, ?, 1, ?, 0, ?, ?, NULL, NULL, ?, ?)`,
         [
             assetId,
             params.patientId,
@@ -247,6 +259,7 @@ async function createPerson(
             imageUrl,
             JSON.stringify(photoUrls),
             JSON.stringify(params.embedding),
+            FACE_EMBEDDING_MODEL,
             params.notes,
             nextReview,
             params.dateOfBirth ?? null,
@@ -272,6 +285,7 @@ async function createPerson(
         imageUrl,
         photoUrls,
         embedding: params.embedding,
+        embeddingModel: FACE_EMBEDDING_MODEL,
         notes: params.notes,
         currentIntervalMinutes: 1,
         nextReview,
@@ -295,7 +309,7 @@ async function createObject(
     const photoError = validatePhotos(params.photoUris);
     if (photoError) return { data: null, error: photoError };
 
-    const embeddingError = validateEmbedding(params.embedding);
+    const embeddingError = validateEmbedding('Object', params.embedding);
     if (embeddingError) return { data: null, error: embeddingError };
 
     const capError = await assertPoolCapacity(params.patientId);
@@ -321,11 +335,11 @@ async function createObject(
     try {
         await db.runAsync(
         `INSERT INTO MemoryAsset
-            (asset_id, patient_id, name, type, status, image_url, photo_urls, embedding, notes,
+            (asset_id, patient_id, name, type, status, image_url, photo_urls, embedding, embedding_model, notes,
             current_interval_minutes, next_review, review_count,
             date_of_birth, relationship, category, reminder_text,
             created_at, updated_at)
-        VALUES (?, ?, ?, 'Object', 'Onboarding', ?, ?, ?, ?, 1, ?, 0, NULL, NULL, ?, ?, ?, ?)`,
+        VALUES (?, ?, ?, 'Object', 'Onboarding', ?, ?, ?, ?, ?, 1, ?, 0, NULL, NULL, ?, ?, ?, ?)`,
         [
             assetId,
             params.patientId,
@@ -333,6 +347,7 @@ async function createObject(
             imageUrl,
             JSON.stringify(photoUrls),
             JSON.stringify(params.embedding),
+            OBJECT_EMBEDDING_MODEL,
             params.notes,
             nextReview,
             params.category ?? null,
@@ -358,6 +373,7 @@ async function createObject(
         imageUrl,
         photoUrls,
         embedding: params.embedding,
+        embeddingModel: OBJECT_EMBEDDING_MODEL,
         notes: params.notes,
         currentIntervalMinutes: 1,
         nextReview,
@@ -411,6 +427,39 @@ async function getAssetById(
   } catch {
     return { data: null, error: 'Failed to load memory.' };
   }
+}
+
+// Assets whose stored vector came from a different model than the one their type now uses. Their embeddings are
+// not comparable to fresh ones, so they must be re-embedded from their photo pool before they can be recognized.
+// Assets with no photo pool cannot be re-embedded automatically and are excluded — they need re-enrollment.
+async function getAssetsNeedingReembed(patientId: string): Promise<MemoryAsset[]> {
+  const assets = await getAssetsForRecognition(patientId);
+  return assets.filter(
+    (a) => a.embeddingModel !== modelFor(a.type) && a.photoUrls.length > 0
+  );
+}
+
+// Rewrites an asset's vector after a model change. Queues a SyncLog row like any other write.
+async function setEmbedding(
+  assetId: string,
+  type: MemoryAssetType,
+  embedding: number[]
+): Promise<ServiceResult<null>> {
+  const embeddingError = validateEmbedding(type, embedding);
+  if (embeddingError) return { data: null, error: embeddingError };
+
+  const db = getDatabase();
+  try {
+    await db.runAsync(
+      `UPDATE MemoryAsset SET embedding = ?, embedding_model = ?, updated_at = ? WHERE asset_id = ?`,
+      [JSON.stringify(embedding), modelFor(type), new Date().toISOString(), assetId]
+    );
+  } catch {
+    return { data: null, error: 'Failed to update embedding.' };
+  }
+
+  await queueSync(assetId, 'UPDATE');
+  return { data: null, error: null };
 }
 
 async function getAssetsForRecognition(
@@ -497,16 +546,18 @@ async function updateAssetPool(
     const photoError = validatePhotoCount(finalCount);
     if (photoError) return { data: null, error: photoError };
 
-    const embeddingError = validateEmbedding(params.embedding);
-    if (embeddingError) return { data: null, error: embeddingError };
-
     const db = getDatabase();
 
-    const existing = await db.getFirstAsync<{ patient_id: string; image_url: string }>(
-        `SELECT patient_id, image_url FROM MemoryAsset WHERE asset_id = ?`,
-        [assetId]
-    );
+    const existing = await db.getFirstAsync<{
+        patient_id: string;
+        image_url: string;
+        type: MemoryAssetType;
+    }>(`SELECT patient_id, image_url, type FROM MemoryAsset WHERE asset_id = ?`, [assetId]);
     if (!existing) return { data: null, error: 'Memory not found.' };
+
+    // Validated against the asset's own type — the caller must re-embed with that type's model.
+    const embeddingError = validateEmbedding(existing.type, params.embedding);
+    if (embeddingError) return { data: null, error: embeddingError };
 
     const uploadResult = await uploadPoolPhotos(
         existing.patient_id,
@@ -528,12 +579,13 @@ async function updateAssetPool(
     try {
         await db.runAsync(
             `UPDATE MemoryAsset
-            SET photo_urls = ?, image_url = ?, embedding = ?, updated_at = ?
+            SET photo_urls = ?, image_url = ?, embedding = ?, embedding_model = ?, updated_at = ?
             WHERE asset_id = ?`,
             [
                 JSON.stringify(photoUrls),
                 imageUrl,
                 JSON.stringify(params.embedding),
+                modelFor(existing.type),
                 now,
                 assetId,
             ]
@@ -645,6 +697,8 @@ export const MemoryAssetService = {
   getAssetsByPatient,
   getAssetById,
   getAssetsForRecognition,
+  getAssetsNeedingReembed,
+  setEmbedding,
   updateAsset,
   updateAssetPool,
   setThumbnail,
