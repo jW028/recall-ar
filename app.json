@@ -43,6 +43,7 @@
       "checkAutomatically": "NEVER"
     },
     "plugins": [
+      "./plugins/withIosNoPush",
       [
         "expo-notifications",
         {

@@ -15,15 +15,18 @@ Notifications.setNotificationHandler({
 
 // Registers the device for push notifications and returns the Expo push token
 async function registerForPushNotifications(): Promise<string | null> {
-    if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('emergency-alerts', {
-            name: 'Emergency Alerts',
-            importance: Notifications.AndroidImportance.MAX,
-            vibrationPattern: [0, 250, 250, 250],
-            lightColor: '#FF0000',
-            sound: 'default',
-        });
+    // Push is Android-only: iOS omits the APNs entitlement so it can build without a paid Apple account
+    if (Platform.OS !== 'android') {
+        return null;
     }
+
+    await Notifications.setNotificationChannelAsync('emergency-alerts', {
+        name: 'Emergency Alerts',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF0000',
+        sound: 'default',
+    });
 
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
