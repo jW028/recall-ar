@@ -1,23 +1,63 @@
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useCurrentPatientId } from '@/store/currentPatientStore';
+import { usePatientLocationViewModel } from '@/viewmodels/useGeofenceViewModels';
 import { useThreatListViewModel } from '@/viewmodels/useThreatViewModel';
-import { useMemo } from 'react';
+import { useRouter } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     FlatList,
+    Platform,
     Pressable,
     StyleSheet,
     Text,
     View,
 } from 'react-native';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+
+
+function MiniMap({ patientId }: { patientId: string }) {
+    const { fetchLocation } = usePatientLocationViewModel(patientId);
+    const [coords, setCoords] = useState<{ lat: number, lng: number } | null>(null);
+
+    useEffect(() => {
+        let mounted = true;
+        fetchLocation().then(res => {
+            if (mounted && res.found && res.location) {
+                setCoords({ lat: res.location.latitude, lng: res.location.longitude });
+            }
+        });
+        return () => { mounted = false };
+    }, [fetchLocation]);
+
+    if (!coords) return <ActivityIndicator style={{ margin: 16 }} />;
+
+    return (
+        <View style={{ height: 140, borderRadius: 8, overflow: 'hidden', marginTop: 12 }}>
+            <MapView
+                style={StyleSheet.absoluteFillObject}
+                provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+                initialRegion={{
+                    latitude: coords.lat,
+                    longitude: coords.lng,
+                    latitudeDelta: 0.005,
+                    longitudeDelta: 0.005
+                }}
+            >
+                <Marker coordinate={{ latitude: coords.lat, longitude: coords.lng }} title="Current Location" pinColor='blue' />
+            </MapView>
+        </View>
+    )
+}
 
 export default function ThreatListScreen() {
     const patientId = useCurrentPatientId() ?? undefined;
     const theme = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
+    const router = useRouter();
 
-    const { threats, isLoading, error, refresh, acknowledgeThreat } =
+    const { threats, isLoading, error, refresh, acknowledgeThreat, resolveThreat, clearHistory } =
         useThreatListViewModel(patientId);
 
     if (isLoading) {
@@ -38,10 +78,19 @@ export default function ThreatListScreen() {
 
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>⚠️ Threats</Text>
-            <Text style={styles.subtitle}>
-                {threats.filter(t => t.alertStatus !== 'Acknowledged').length} unacknowledged
-            </Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+                <View>
+                    <Text style={styles.title}>⚠️ Threats</Text>
+                    <Text style={[styles.subtitle, { marginBottom: 0 }]}>
+                        {threats.filter(t => t.alertStatus !== 'Resolved').length} active alerts
+                    </Text>
+                </View>
+                {threats.length > 0 && (
+                    <Pressable onPress={clearHistory} style={{ padding: 8, backgroundColor: theme.errorBackground, borderRadius: 8, marginTop: 4 }}>
+                        <Text style={{ color: theme.error, fontWeight: '600', fontSize: 13 }}>Clear History</Text>
+                    </Pressable>
+                )}
+            </View>
 
             {threats.length === 0 ? (
                 <View style={styles.emptyState}>
@@ -60,24 +109,26 @@ export default function ThreatListScreen() {
                     refreshing={isLoading}
                     renderItem={({ item }) => {
                         const isAcknowledged = item.alertStatus === 'Acknowledged';
+                        const isResolved = item.alertStatus === 'Resolved';
                         return (
                             <View
                                 style={[
                                     styles.card,
                                     isAcknowledged && styles.cardAcknowledged,
+                                    isResolved && { opacity: 0.6, borderColor: theme.border }
                                 ]}
                             >
                                 <View style={styles.cardHeader}>
                                     <View
                                         style={[
                                             styles.statusBadge,
-                                            isAcknowledged
+                                            (isAcknowledged || isResolved)
                                                 ? styles.badgeAcknowledged
                                                 : styles.badgeActive,
                                         ]}
                                     >
                                         <Text style={styles.statusBadgeText}>
-                                            {isAcknowledged ? '✓ Acknowledged' : '⚠ Active'}
+                                            {isResolved ? '✓ Resolved' : isAcknowledged ? '✓ Acknowledged' : '⚠ Active'}
                                         </Text>
                                     </View>
                                     <Text style={styles.threatType}>{item.threatType}</Text>
@@ -93,12 +144,6 @@ export default function ThreatListScreen() {
                                         {new Date(item.detectedTime).toLocaleString()}
                                     </Text>
                                 </View>
-                                <View style={styles.detailRow}>
-                                    <Text style={styles.detailLabel}>Alert time</Text>
-                                    <Text style={styles.detailValue}>
-                                        {new Date(item.alertTime).toLocaleString()}
-                                    </Text>
-                                </View>
                                 {item.acknowledgedTime && (
                                     <View style={styles.detailRow}>
                                         <Text style={styles.detailLabel}>Acknowledged</Text>
@@ -108,13 +153,27 @@ export default function ThreatListScreen() {
                                     </View>
                                 )}
 
-                                {!isAcknowledged && (
-                                    <Pressable
-                                        style={styles.ackButton}
-                                        onPress={() => acknowledgeThreat(item.threatId)}
-                                    >
-                                        <Text style={styles.ackButtonText}>Acknowledge</Text>
-                                    </Pressable>
+                                {!isResolved && (
+                                    <View style={{ flexDirection: 'column', gap: 10, marginTop: 12 }}>
+                                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                                            <Pressable
+                                                style={[styles.ackButton, { flex: 1, backgroundColor: theme.success || '#10B981', marginTop: 0 }]}
+                                                onPress={() => resolveThreat(item.threatId)}
+                                            >
+                                                <Text style={styles.ackButtonText}>Resolve</Text>
+                                            </Pressable>
+                                        </View>
+
+                                        {/* View Location Button for Panic alerts */}
+                                        {item.threatType === 'Panic Button' && (
+                                            <Pressable
+                                                style={[styles.ackButton, { backgroundColor: theme.primarySoft, marginTop: 0 }]}
+                                                onPress={() => router.push(`/(caregiver)/location`)}
+                                            >
+                                                <Text style={[styles.ackButtonText, { color: theme.primary }]}>View Live Location</Text>
+                                            </Pressable>
+                                        )}
+                                    </View>
                                 )}
                             </View>
                         );

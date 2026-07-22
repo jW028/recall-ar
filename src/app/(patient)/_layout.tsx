@@ -3,6 +3,7 @@ import { ThemeSchemeContext } from '@/hooks/use-theme';
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 
+
 // Patient app is always light mode
 export default function PatientLayout() {
     return (

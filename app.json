@@ -43,6 +43,15 @@
       "checkAutomatically": "NEVER"
     },
     "plugins": [
+      "./plugins/withIosNoPush",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#ffffff",
+          "sounds": []
+        }
+      ],
       "expo-router",
       [
         "expo-splash-screen",

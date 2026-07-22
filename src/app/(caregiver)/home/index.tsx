@@ -189,6 +189,15 @@ export default function CaregiverHomeScreen() {
                     accent
                 />
 
+                <ActionRow
+                    icon="alert-circle"
+                    label="Manage Alerts"
+                    subtitle="View panic buttons and geofence threats"
+                    onPress={() => router.push('/(caregiver)/alerts')}
+                    accent
+                />
+
+
                 <Text style={styles.sectionTitle}>Quick Actions</Text>
                 <View style={styles.actions}>
                     <ActionRow
