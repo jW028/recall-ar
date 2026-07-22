@@ -224,7 +224,7 @@ export const syncTableConfig: Record<SyncableTable, SyncTableConfig> = {
             threat_status: row.threat_status,
             alert_status: row.alert_status,
             alert_time: row.alert_time,
-            acknowledged_time: row.acknowledged_time,
+            acknowledged_time: row.acknowledged_time ?? null,
         }),
     },
 };

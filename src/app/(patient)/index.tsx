@@ -1,13 +1,18 @@
 import { Screen } from '@/components/common/Screen';
+import { PanicButton } from '@/components/patient/PanicButton';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { LocationService } from '@/services/LocationService';
 import { PairingService } from '@/services/PairingService';
+import { SyncService } from '@/services/SyncService';
+import { ThreatService } from '@/services/ThreatService';
+import { NotificationService } from '@/services/NotificationService';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+
 
 export default function PatientHomeScreen() {
     const theme = useTheme();
@@ -63,6 +68,46 @@ export default function PatientHomeScreen() {
         router.replace('/(auth)/pair');
     };
 
+    const handleEmergency = async () => {
+        const pairing = await PairingService.getPersistedPairing();
+
+        if (!pairing) return;
+
+        try {
+            // 1. Instantly get current location of the patient for the alert
+            const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+            await LocationService.publishLocation(pairing.patientId, {
+                latitude: loc.coords.latitude,
+                longitude: loc.coords.longitude,
+                accuracy: loc.coords.accuracy,
+            });
+
+            // 2. Create the emergency threat
+            await ThreatService.createThreat({
+                patientId: pairing.patientId,
+                threatType: 'Panic Button',
+                threatStatus: 'Critical',
+                alertStatus: 'Active'
+            });
+
+            // 3. Force an instant push to the cloud immediately
+            await SyncService.drainQueue();
+
+            // 4. Look up caregiver's push token and send Expo push notification directly
+            const pushToken = await NotificationService.getPushTokenForCaregiver(pairing.caregiverId);
+            if (pushToken) {
+                await NotificationService.sendEmergencyNotification(pushToken);
+            } else {
+                console.warn('[PatientHome] Caregiver push token not found');
+            }
+
+            Alert.alert("Emergency Broadcasted", "Your caregiver has been notified of your location.");
+        } catch (e) {
+            console.error(e);
+            Alert.alert("Error", "Could not send emergency alert.");
+        }
+    };
+
     return (
         <Screen topInset>
             <ScrollView contentContainerStyle={styles.content}>
@@ -70,6 +115,8 @@ export default function PatientHomeScreen() {
                 <Text style={styles.subtitle}>
                     Point the camera at a face or object to identify it, or review your memories.
                 </Text>
+
+                <PanicButton onTrigger={handleEmergency} />
 
                 <Pressable
                     style={({ pressed }) => [styles.actionCard, styles.primaryCard, pressed && styles.pressed]}

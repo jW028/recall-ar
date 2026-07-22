@@ -28,7 +28,7 @@ function mapRowToThreat(row: Record<string, unknown>): Threat {
         threatStatus: row.threat_status as string,
         alertStatus: row.alert_status as string,
         alertTime: row.alert_time as string,
-        acknowledgedTime: row.acknowledged_time as string | null,           
+        acknowledgedTime: row.acknowledged_time as string | null,
     };
 }
 
@@ -58,8 +58,8 @@ async function createThreat(
 
     try {
         await db.runAsync(
-            `INSERT INTO Threat (threat_id, patient_id, geoEvent_id, threat_type, detected_time, threat_status, alert_status, alert_time, acknowledged_time)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+            `INSERT INTO Threat (threat_id, patient_id, threat_type, detected_time, threat_status, alert_status, alert_time, acknowledged_time)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 threatId,
                 params.patientId,
@@ -71,7 +71,7 @@ async function createThreat(
             ]
         );
     } catch {
-        return { data: null, error: 'Failed to save threat. Please try again.'};
+        return { data: null, error: 'Failed to save threat. Please try again.' };
     }
 
     await queueSync('Threat', threatId, 'INSERT');
@@ -87,13 +87,13 @@ async function createThreat(
         acknowledgedTime: null,
     };
 
-    return { data: threat, error: null};
+    return { data: threat, error: null };
 }
 
 
 async function getThreatsByPatient(
     patientId: string
-) : Promise<ServiceResult<Threat[]>> {
+): Promise<ServiceResult<Threat[]>> {
     const db = getDatabase();
 
     try {
@@ -124,6 +124,25 @@ async function acknowledgeThreat(threatId: string): Promise<ServiceResult> {
     return { data: null, error: null };
 }
 
+async function resolveThreat(threatId: string): Promise<ServiceResult> {
+    const db = getDatabase();
+    const now = new Date().toISOString();
+
+    try {
+        await db.runAsync(
+            `UPDATE Threat SET alert_status = 'Resolved', acknowledged_time = coalesce(acknowledged_time, ?) WHERE threat_id = ?`,
+            [now, threatId]
+        );
+    } catch {
+        return { data: null, error: 'Failed to resolve threat.' };
+    }
+
+    await queueSync('Threat', threatId, 'UPDATE');
+    return { data: null, error: null };
+}
+
+
+
 
 async function pullThreatsFromCloud(
     patientId: string
@@ -134,7 +153,7 @@ async function pullThreatsFromCloud(
         .eq('patient_id', patientId);
 
     if (fetchError) {
-        return { data: null, error: 'Failed to sync threats from cloud.'};
+        return { data: null, error: 'Failed to sync threats from cloud.' };
     }
 
     const db = getDatabase();
@@ -163,9 +182,22 @@ async function pullThreatsFromCloud(
     return { data: count, error: null };
 }
 
+async function clearAllLocalThreats(): Promise<ServiceResult> {
+    const db = getDatabase();
+    try {
+        await db.runAsync('DELETE FROM Threat');
+        await db.runAsync("DELETE FROM SyncLog WHERE table_name = 'Threat'");
+        return { data: null, error: null };
+    } catch {
+        return { data: null, error: 'Failed to clear local threats.' };
+    }
+}
+
 export const ThreatService = {
     createThreat,
     getThreatsByPatient,
     acknowledgeThreat,
+    resolveThreat,
     pullThreatsFromCloud,
+    clearAllLocalThreats,
 };
