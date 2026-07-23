@@ -8,9 +8,9 @@ import type { MemoryAsset } from '@/models/MemoryAsset';
 import { useCurrentPatientId } from '@/store/currentPatientStore';
 import { useMemoryAssetListViewModel } from '@/viewmodels/useMemoryAssetViewModel';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image } from 'react-native';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import {
     ActivityIndicator,
     FlatList,
@@ -126,6 +126,12 @@ export default function AssetListScreen() {
 
     const { filteredAssets, isLoading, error, refresh, typeFilter, setTypeFilter } =
         useMemoryAssetListViewModel(patientId);
+
+    // Apply the filter when deep-linked from the Home stat cards (e.g. ?type=Object)
+    const { type } = useLocalSearchParams<{ type?: string }>();
+    useEffect(() => {
+        if (type === 'Object' || type === 'Person') setTypeFilter(type);
+    }, [type, setTypeFilter]);
 
     const goToNew = () => router.push(`/(caregiver)/memories/new`);
     const goToAsset = (assetId: string) =>

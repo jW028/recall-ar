@@ -182,12 +182,14 @@ export default function CaregiverHomeScreen() {
                         value={accuracy?.value ?? '—'}
                         valueColor={accuracy ? theme.success : theme.textFaint}
                         delta={accuracy?.delta}
+                        onPress={() => router.push({ pathname: '/(caregiver)/training', params: { tab: 'analytics' } })}
                     />
                     <MetricTile
                         label="Avg response time"
                         value={latency?.value ?? '—'}
                         valueColor={latency ? theme.primary : theme.textFaint}
                         delta={latency?.delta}
+                        onPress={() => router.push({ pathname: '/(caregiver)/training', params: { tab: 'analytics' } })}
                     />
                 </View>
 

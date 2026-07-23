@@ -2,7 +2,7 @@ import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 interface MetricTileProps {
     label: string;
@@ -10,16 +10,18 @@ interface MetricTileProps {
     valueColor?: string;
     // Optional delta caption: positive drives color (green good / red bad), up drives the arrow direction (actual value movement)
     delta?: { text: string; positive: boolean; up: boolean } | null;
+    // When provided, the tile becomes a button (e.g. tapping a training metric opens Analytics)
+    onPress?: () => void;
 }
 
 // Card showing a headline metric with an optional improving/declining delta
-export function MetricTile({ label, value, valueColor, delta }: MetricTileProps) {
+export function MetricTile({ label, value, valueColor, delta, onPress }: MetricTileProps) {
     const theme = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
     const deltaColor = delta?.positive ? theme.success : theme.error;
 
-    return (
-        <View style={styles.tile}>
+    const content = (
+        <>
             <Text style={styles.label}>{label}</Text>
             <Text style={[styles.value, { color: valueColor ?? theme.body }]}>{value}</Text>
             {delta && (
@@ -32,8 +34,23 @@ export function MetricTile({ label, value, valueColor, delta }: MetricTileProps)
                     <Text style={[styles.deltaText, { color: deltaColor }]}>{delta.text}</Text>
                 </View>
             )}
-        </View>
+        </>
     );
+
+    if (onPress) {
+        return (
+            <Pressable
+                style={({ pressed }) => [styles.tile, pressed && styles.pressed]}
+                onPress={onPress}
+                accessibilityRole="button"
+                accessibilityLabel={`${label} ${value}`}
+            >
+                {content}
+            </Pressable>
+        );
+    }
+
+    return <View style={styles.tile}>{content}</View>;
 }
 
 function createStyles(theme: Theme) {
@@ -45,6 +62,9 @@ function createStyles(theme: Theme) {
             borderWidth: 1,
             borderColor: theme.border,
             padding: 16,
+        },
+        pressed: {
+            opacity: 0.6,
         },
         label: {
             fontSize: 13,
