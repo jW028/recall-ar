@@ -39,6 +39,15 @@ export default function PatientLayout() {
                         ),
                     }}
                 />
+                <Tabs.Screen
+                    name="album"
+                    options={{
+                        title: 'Album',
+                        tabBarIcon: ({ focused, color, size }) => (
+                            <Ionicons name={focused ? 'images' : 'images-outline'} size={size} color={color} />
+                        ),
+                    }}
+                />
             </Tabs>
         </ThemeSchemeContext.Provider>
     );
