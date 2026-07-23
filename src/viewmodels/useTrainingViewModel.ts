@@ -1,5 +1,6 @@
 import type { MemoryAsset } from '@/models/MemoryAsset';
 import type { Question } from '@/models/TrainingSession';
+import { EngagementService } from '@/services/EngagementService';
 import { PairingService } from '@/services/PairingService';
 import { SyncService } from '@/services/SyncService';
 import { TrainingService } from '@/services/TrainingService';
@@ -12,12 +13,21 @@ interface AnswerResult {
     correct: boolean;
 }
 
+// Positive-only session tally shown on the completion screen. Never tracks a "wrong" count.
+export interface SessionSummary {
+    answered: number;
+    correct: number;
+    masteredNames: string[]; // assets that graduated to Maintenance during this session
+}
+
 interface UseTrainingViewModel {
     status: TrainingStatus;
     error: string | null;
     question: Question | null;
     progress: { current: number; total: number };
     lastResult: AnswerResult | null;
+    summary: SessionSummary;
+    streakDays: number | undefined;
     isSubmitting: boolean;
     answer: (choice: MemoryAsset) => Promise<void>;
     next: () => void;
@@ -32,7 +42,13 @@ export function useTrainingViewModel(): UseTrainingViewModel {
     const [index, setIndex] = useState(0);
     const [question, setQuestion] = useState<Question | null>(null);
     const [lastResult, setLastResult] = useState<AnswerResult | null>(null);
+    const [summary, setSummary] = useState<SessionSummary>({
+        answered: 0,
+        correct: 0,
+        masteredNames: [],
+    });
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [streakDays, setStreakDays] = useState<number | undefined>(undefined);
 
     const patientIdRef = useRef<string | null>(null);
     // Timestamp (performance.now) of when the current question's choices painted. Null until the UI reports the paint, and reset for each question.
@@ -93,6 +109,14 @@ export function useTrainingViewModel(): UseTrainingViewModel {
         })();
     }, [loadQuestion]);
 
+    // Fetch the streak for the summary screen once the session finishes; today's answers are already persisted by then.
+    useEffect(() => {
+        if (status !== 'complete' || !patientIdRef.current) return;
+        EngagementService.getTrainingStreak(patientIdRef.current).then((result) => {
+            if (mountedRef.current && result.data !== null) setStreakDays(result.data);
+        });
+    }, [status]);
+
     // Stamp the paint time once per question. Only the first paint counts; later onLayout passes (rotation, reveal) must not restart the timer.
     const markRendered = useCallback(() => {
         if (renderedAtRef.current === null) {
@@ -124,12 +148,20 @@ export function useTrainingViewModel(): UseTrainingViewModel {
             if (!mountedRef.current) return;
             setIsSubmitting(false);
 
-            if (result.error) {
+            if (result.error || !result.data) {
                 // Let the patient try again rather than blocking the session.
-                setError(result.error);
+                setError(result.error ?? 'Failed to record answer. Please try again.');
                 return;
             }
+            const becameMastered = result.data.becameMastered;
             setError(null);
+            setSummary((prev) => ({
+                answered: prev.answered + 1,
+                correct: prev.correct + (correct ? 1 : 0),
+                masteredNames: becameMastered
+                    ? [...prev.masteredNames, question.correctAsset.name]
+                    : prev.masteredNames,
+            }));
             setLastResult({ selectedAssetId: choice.assetId, correct });
         },
         [question, lastResult, isSubmitting]
@@ -155,6 +187,8 @@ export function useTrainingViewModel(): UseTrainingViewModel {
         question,
         progress: { current: index + 1, total: queue.length },
         lastResult,
+        summary,
+        streakDays,
         isSubmitting,
         answer,
         next,

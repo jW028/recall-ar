@@ -69,8 +69,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos for enrolling memories.",
-          "cameraPermission": "Allow $(PRODUCT_NAME) to take photos for enrolling memories."
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos for enrolling memories and patient profile pictures.",
+          "cameraPermission": "Allow $(PRODUCT_NAME) to take photos for enrolling memories and patient profile pictures."
         }
       ]
     ],

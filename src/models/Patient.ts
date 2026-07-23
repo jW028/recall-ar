@@ -5,6 +5,7 @@ export interface Patient {
     dateOfBirth: string,
     medicalNotes: string | null,
     emergencyContact: string,
+    imageUrl: string | null,
     createdAt: string,
     updatedAt: string,
 }

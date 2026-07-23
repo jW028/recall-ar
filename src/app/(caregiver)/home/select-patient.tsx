@@ -1,3 +1,4 @@
+import { Avatar } from '@/components/common/Avatar';
 import { Button } from '@/components/common/Button';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Screen } from '@/components/common/Screen';
@@ -51,9 +52,7 @@ function PatientCard({
       onPress={onPress}
     >
       <View style={styles.avatar}>
-        <Text style={styles.avatarText}>
-          {patient.patientName.charAt(0).toUpperCase()}
-        </Text>
+        <Avatar imageUrl={patient.imageUrl} name={patient.patientName} size={48} />
       </View>
       <View style={styles.cardInfo}>
         <Text style={styles.cardName}>{patient.patientName}</Text>

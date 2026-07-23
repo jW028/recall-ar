@@ -156,14 +156,24 @@ export default function CaregiverHomeScreen() {
 
             <ScrollView contentContainerStyle={styles.content}>
                 <CurrentPatientCard
-                    name={currentPatient?.patientName ?? '—'}
+                    patients={patients}
+                    currentPatientId={currentPatientId}
+                    onSelect={setCurrentPatient}
                     onViewEdit={() => router.push('/(caregiver)/home/patient')}
                     onChange={() => router.push('/(caregiver)/home/select-patient')}
                 />
 
                 <View style={styles.row}>
-                    <StatTile value={objectCount} label="Objects" />
-                    <StatTile value={peopleCount} label="People" />
+                    <StatTile
+                        value={objectCount}
+                        label="Objects"
+                        onPress={() => router.push({ pathname: '/(caregiver)/memories', params: { type: 'Object' } })}
+                    />
+                    <StatTile
+                        value={peopleCount}
+                        label="People"
+                        onPress={() => router.push({ pathname: '/(caregiver)/memories', params: { type: 'Person' } })}
+                    />
                 </View>
 
                 <View style={styles.row}>
@@ -172,12 +182,14 @@ export default function CaregiverHomeScreen() {
                         value={accuracy?.value ?? '—'}
                         valueColor={accuracy ? theme.success : theme.textFaint}
                         delta={accuracy?.delta}
+                        onPress={() => router.push({ pathname: '/(caregiver)/training', params: { tab: 'analytics' } })}
                     />
                     <MetricTile
                         label="Avg response time"
                         value={latency?.value ?? '—'}
                         valueColor={latency ? theme.primary : theme.textFaint}
                         delta={latency?.delta}
+                        onPress={() => router.push({ pathname: '/(caregiver)/training', params: { tab: 'analytics' } })}
                     />
                 </View>
 

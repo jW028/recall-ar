@@ -10,12 +10,15 @@ import { MIGRATION_V5_TRAINING_LATENCY } from './migrations/v5_training_latency'
 import { MIGRATION_V6_UPDATE_THREAT } from './migrations/v6_update_threat';
 import { MIGRATION_V7_ASSET_PAUSE } from './migrations/v7_asset_pause';
 import { MIGRATION_V8_EMBEDDING_MODEL } from './migrations/v8_embedding_model';
+import { MIGRATION_V9_RECOGNITION_EVENT } from './migrations/v9_recognition_event';
+import { MIGRATION_V10_ENCOURAGEMENT } from './migrations/v10_encouragement';
+import { MIGRATION_V11_PATIENT_PROFILE_PICTURE } from './migrations/v11_patient_profile_picture';
 import { CREATE_TABLES } from './schema';
 
 const DATABASE_NAME = 'recallar.db';
 
 // Bump this number when a new migration is added in the MIGRATIONS array
-const LATEST_VERSION = 8;
+const LATEST_VERSION = 11;
 
 
 interface Migration {
@@ -65,6 +68,21 @@ const MIGRATIONS: Migration[] = [
         description: 'Add embedding_model to MemoryAsset',
         sql: MIGRATION_V8_EMBEDDING_MODEL,
     },
+    {
+        version: 9,
+        description: 'Add RecognitionEvent table',
+        sql: MIGRATION_V9_RECOGNITION_EVENT,
+    },
+    {
+        version: 10,
+        description: 'Add Encouragement table',
+        sql: MIGRATION_V10_ENCOURAGEMENT,
+    },
+    {
+        version: 11,
+        description: 'Add image_url profile picture column to Patient',
+        sql: MIGRATION_V11_PATIENT_PROFILE_PICTURE,
+    },
 ]
 
 // Migration runner, called by SQLiteProvider's onInit
@@ -109,6 +127,13 @@ async function ensureColumns(db: SQLiteDatabase): Promise<void> {
     if (!assetCols.some((c) => c.name === 'embedding_model')) {
         console.log('[DB] Backfilling missing column MemoryAsset.embedding_model');
         await db.execAsync(`ALTER TABLE MemoryAsset ADD COLUMN embedding_model TEXT;`);
+    }
+
+    // image_url is added in v11; backfill on DBs that reached v11 before it was wired in.
+    const patientCols = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(Patient)`);
+    if (!patientCols.some((c) => c.name === 'image_url')) {
+        console.log('[DB] Backfilling missing column Patient.image_url');
+        await db.execAsync(`ALTER TABLE Patient ADD COLUMN image_url TEXT;`);
     }
 }
 

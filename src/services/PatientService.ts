@@ -12,6 +12,7 @@ export interface CreatePatientParams {
     dateOfBirth: string;
     medicalNotes?: string | null;
     emergencyContact: string;
+    imageUrl?: string | null;
 }
 
 export interface UpdatePatientParams {
@@ -19,6 +20,7 @@ export interface UpdatePatientParams {
     dateOfBirth?: string;
     medicalNotes?: string | null;
     emergencyContact?: string;
+    imageUrl?: string | null;
   }
 
 export interface ServiceResult<T = void> {
@@ -36,6 +38,7 @@ function mapRowToPatient(row: Record<string, unknown>): Patient {
         dateOfBirth: row.date_of_birth as string,
         medicalNotes: row.medical_notes as string | null,
         emergencyContact: row.emergency_contact as string,
+        imageUrl: (row.image_url as string | null) ?? null,
         createdAt: row.created_at as string,
         updatedAt: row.updated_at as string,
     };
@@ -77,8 +80,8 @@ async function createPatient(
     try {
         await db.runAsync(
         `INSERT INTO Patient
-            (patient_id, caregiver_id, patient_name, date_of_birth, medical_notes, emergency_contact, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            (patient_id, caregiver_id, patient_name, date_of_birth, medical_notes, emergency_contact, image_url, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
             patientId,
             params.caregiverId,
@@ -86,6 +89,7 @@ async function createPatient(
             params.dateOfBirth,
             params.medicalNotes ?? null,
             params.emergencyContact.trim(),
+            params.imageUrl ?? null,
             now,
             now,
         ]
@@ -103,6 +107,7 @@ async function createPatient(
         dateOfBirth: params.dateOfBirth,
         medicalNotes: params.medicalNotes ?? null,
         emergencyContact: params.emergencyContact.trim(),
+        imageUrl: params.imageUrl ?? null,
         createdAt: now,
         updatedAt: now,
     };
@@ -183,6 +188,10 @@ async function updatePatient(
       fields.push('emergency_contact = ?');
       values.push(params.emergencyContact.trim());
     }
+    if (params.imageUrl !== undefined) {
+      fields.push('image_url = ?');
+      values.push(params.imageUrl);
+    }
 
     if (fields.length === 0) {
       return { data: null, error: 'No fields to update.' };
@@ -219,6 +228,41 @@ async function deletePatient(patientId: string): Promise<ServiceResult> {
     return { data: null, error: null };
 }
 
+// Uploads a local image uri to the patient-avatars bucket, returns the public URL. ownerId (patientId, or caregiverId when the patient row doesn't exist yet) just namespaces the storage folder.
+async function uploadProfilePicture(
+    ownerId: string,
+    photoUri: string
+): Promise<ServiceResult<string>> {
+    try {
+        const fileExt = (photoUri.split('.').pop() ?? 'jpg').toLowerCase();
+        const contentType =
+            fileExt === 'png' ? 'image/png' :
+            fileExt === 'webp' ? 'image/webp' :
+            'image/jpeg';
+        const photoId = Crypto.randomUUID();
+        const path = `${ownerId}/${photoId}.${fileExt}`;
+
+        // React Native's fetch(...).blob() yields a blob that supabase-js uploads as 0 bytes; reading an ArrayBuffer uploads the real file contents. See https://supabase.com/docs/guides/storage (Expo).
+        const arrayBuffer = await fetch(photoUri).then((res) => res.arrayBuffer());
+        if (arrayBuffer.byteLength === 0) {
+            return { data: null, error: 'Selected photo is empty. Please choose another.' };
+        }
+
+        const { error: uploadError } = await supabase.storage
+            .from('patient-avatars')
+            .upload(path, arrayBuffer, { upsert: true, contentType });
+
+        if (uploadError) {
+            return { data: null, error: 'Failed to upload photo. Please check your connection.' };
+        }
+
+        const { data } = supabase.storage.from('patient-avatars').getPublicUrl(path);
+        return { data: data.publicUrl, error: null };
+    } catch {
+        return { data: null, error: 'Failed to upload photo. Please check your connection.' };
+    }
+}
+
 // Sync with cloud on first login / new device
 async function pullPatientsFromCloud(
     caregiverId: string
@@ -239,8 +283,8 @@ async function pullPatientsFromCloud(
       for (const row of rows ?? []) {
         await db.runAsync(
           `INSERT OR REPLACE INTO Patient
-            (patient_id, caregiver_id, patient_name, date_of_birth, medical_notes, emergency_contact, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            (patient_id, caregiver_id, patient_name, date_of_birth, medical_notes, emergency_contact, image_url, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             row.patient_id,
             row.caregiver_id,
@@ -248,6 +292,7 @@ async function pullPatientsFromCloud(
             row.date_of_birth,
             row.medical_notes,
             row.emergency_contact,
+            row.image_url ?? null,
             row.created_at,
             row.updated_at,
           ]
@@ -266,5 +311,6 @@ export const PatientService = {
     getPatientById,
     updatePatient,
     deletePatient,
+    uploadProfilePicture,
     pullPatientsFromCloud,
 };

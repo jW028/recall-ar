@@ -1,5 +1,6 @@
 import { AnalyticsEmptyState } from '@/components/analytics/AnalyticsEmptyState';
 import { DegradationBanner } from '@/components/analytics/DegradationBanner';
+import { EncouragementPanel } from '@/components/analytics/EncouragementPanel';
 import { EngagementCard } from '@/components/analytics/EngagementCard';
 import { SummaryCard } from '@/components/analytics/SummaryCard';
 import { TimeframeSelector } from '@/components/analytics/TimeframeSelector';
@@ -14,7 +15,8 @@ import type { MemoryAsset } from '@/models/MemoryAsset';
 import { useCurrentPatientId } from '@/store/currentPatientStore';
 import { useAnalyticsViewModel } from '@/viewmodels/useAnalyticsViewModel';
 import { useMemoryAssetListViewModel } from '@/viewmodels/useMemoryAssetViewModel';
-import { useMemo, useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 type TrainingTab = 'overview' | 'analytics';
@@ -24,6 +26,12 @@ export default function TrainingScreen() {
     const theme = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
     const [tab, setTab] = useState<TrainingTab>('overview');
+
+    // Select the segment when deep-linked from the Home metric cards (e.g. ?tab=analytics)
+    const { tab: tabParam } = useLocalSearchParams<{ tab?: string }>();
+    useEffect(() => {
+        if (tabParam === 'analytics' || tabParam === 'overview') setTab(tabParam);
+    }, [tabParam]);
 
     if (!id) {
         return (
@@ -95,6 +103,8 @@ function OverviewTab({
             contentContainerStyle={styles.container}
             refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} />}
         >
+            <EncouragementPanel patientId={patientId} />
+
             <Text style={styles.poolCount}>
                 {activeCount} of {MAX_MONTHLY_POOL_SIZE} active
             </Text>

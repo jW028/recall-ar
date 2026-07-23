@@ -11,7 +11,9 @@ export type SyncableTable =
     | 'CognitiveReport'
     | 'Geofence'
     | 'GeofenceEvent'
-    | 'Threat';
+    | 'Threat'
+    | 'RecognitionEvent'
+    | 'Encouragement';
 
 // The pull side of a table's config. Absent for push-only tables (e.g. the training tables flow patient -> Supabase only and are never pulled back).
 interface PullConfig<TSupabaseRow = any> {
@@ -60,6 +62,7 @@ export const syncTableConfig: Record<SyncableTable, SyncTableConfig> = {
             date_of_birth: row.date_of_birth,
             medical_notes: row.medical_notes,
             emergency_contact: row.emergency_contact,
+            image_url: row.image_url,
             created_at: row.created_at,
             updated_at: row.updated_at,
         }),
@@ -73,6 +76,7 @@ export const syncTableConfig: Record<SyncableTable, SyncTableConfig> = {
                 date_of_birth: remote.date_of_birth,
                 medical_notes: remote.medical_notes,
                 emergency_contact: remote.emergency_contact,
+                image_url: remote.image_url,
                 created_at: remote.created_at,
                 updated_at: remote.updated_at,
             }),
@@ -226,5 +230,49 @@ export const syncTableConfig: Record<SyncableTable, SyncTableConfig> = {
             alert_time: row.alert_time,
             acknowledged_time: row.acknowledged_time ?? null,
         }),
+    },
+
+    RecognitionEvent: {
+        supabaseTable: 'RecognitionEvent',
+        primaryKey: 'recognition_id',
+        readLocalRow: readByPrimaryKey('RecognitionEvent', 'recognition_id'),
+        toSupabaseRow: (row) => ({
+            recognition_id: row.recognition_id,
+            patient_id: row.patient_id,
+            asset_id: row.asset_id,
+            event_date: row.event_date,
+            event_time: row.event_time,
+        }),
+    },
+
+    // Bidirectional: the caregiver device pushes sends, the patient device pulls them and pushes acks back.
+    Encouragement: {
+        supabaseTable: 'Encouragement',
+        primaryKey: 'encouragement_id',
+        readLocalRow: readByPrimaryKey('Encouragement', 'encouragement_id'),
+        toSupabaseRow: (row) => ({
+            encouragement_id: row.encouragement_id,
+            patient_id: row.patient_id,
+            caregiver_id: row.caregiver_id,
+            message: row.message,
+            emoji: row.emoji ?? null,
+            created_at: row.created_at,
+            ack_time: row.ack_time ?? null,
+            updated_at: row.updated_at,
+        }),
+        pull: {
+            watermarkColumn: 'updated_at',
+            scopeColumn: 'patient_id',
+            fromSupabaseRow: (remote) => ({
+                encouragement_id: remote.encouragement_id,
+                patient_id: remote.patient_id,
+                caregiver_id: remote.caregiver_id,
+                message: remote.message,
+                emoji: remote.emoji,
+                created_at: remote.created_at,
+                ack_time: remote.ack_time,
+                updated_at: remote.updated_at,
+            }),
+        },
     },
 };

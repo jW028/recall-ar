@@ -1,5 +1,8 @@
 import { Screen } from '@/components/common/Screen';
 import { PanicButton } from '@/components/patient/PanicButton';
+import { EncouragementBanner } from '@/components/patient/EncouragementBanner';
+import { StreakChip } from '@/components/patient/StreakChip';
+import { TodayMoments } from '@/components/patient/TodayMoments';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { LocationService } from '@/services/LocationService';
@@ -10,6 +13,7 @@ import { NotificationService } from '@/services/NotificationService';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
+import { usePatientHomeViewModel } from '@/viewmodels/usePatientHomeViewModel';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -19,6 +23,8 @@ export default function PatientHomeScreen() {
     const styles = useMemo(() => createStyles(theme), [theme]);
     const router = useRouter();
     const [isSigningOut, setIsSigningOut] = useState(false);
+    const { streakDays, recognitions, encouragement, dismissEncouragement } =
+        usePatientHomeViewModel();
 
     // ── Publish GPS location every 30 s while app is open ──────────
     useEffect(() => {
@@ -115,6 +121,12 @@ export default function PatientHomeScreen() {
                 <Text style={styles.subtitle}>
                     Point the camera at a face or object to identify it, or review your memories.
                 </Text>
+
+                <EncouragementBanner encouragement={encouragement} onDismiss={dismissEncouragement} />
+
+                <StreakChip days={streakDays} />
+
+                <TodayMoments moments={recognitions} />
 
                 <PanicButton onTrigger={handleEmergency} />
 
