@@ -214,6 +214,54 @@ export type Database = {
           },
         ]
       }
+      Encouragement: {
+        Row: {
+          ack_time: string | null
+          caregiver_id: string
+          created_at: string
+          emoji: string | null
+          encouragement_id: string
+          message: string
+          patient_id: string
+          updated_at: string
+        }
+        Insert: {
+          ack_time?: string | null
+          caregiver_id: string
+          created_at: string
+          emoji?: string | null
+          encouragement_id: string
+          message: string
+          patient_id: string
+          updated_at: string
+        }
+        Update: {
+          ack_time?: string | null
+          caregiver_id?: string
+          created_at?: string
+          emoji?: string | null
+          encouragement_id?: string
+          message?: string
+          patient_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "Encouragement_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "Caregiver"
+            referencedColumns: ["caregiver_id"]
+          },
+          {
+            foreignKeyName: "Encouragement_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "Patient"
+            referencedColumns: ["patient_id"]
+          },
+        ]
+      }
       Geofence: {
         Row: {
           center_latitude: number
@@ -390,6 +438,7 @@ export type Database = {
           created_at: string
           date_of_birth: string
           emergency_contact: string
+          image_url: string | null
           medical_notes: string | null
           patient_id: string
           patient_name: string
@@ -400,6 +449,7 @@ export type Database = {
           created_at?: string
           date_of_birth: string
           emergency_contact: string
+          image_url?: string | null
           medical_notes?: string | null
           patient_id?: string
           patient_name: string
@@ -410,6 +460,7 @@ export type Database = {
           created_at?: string
           date_of_birth?: string
           emergency_contact?: string
+          image_url?: string | null
           medical_notes?: string | null
           patient_id?: string
           patient_name?: string
@@ -422,6 +473,45 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "Caregiver"
             referencedColumns: ["caregiver_id"]
+          },
+        ]
+      }
+      RecognitionEvent: {
+        Row: {
+          asset_id: string
+          event_date: string
+          event_time: string
+          patient_id: string
+          recognition_id: string
+        }
+        Insert: {
+          asset_id: string
+          event_date: string
+          event_time: string
+          patient_id: string
+          recognition_id: string
+        }
+        Update: {
+          asset_id?: string
+          event_date?: string
+          event_time?: string
+          patient_id?: string
+          recognition_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "RecognitionEvent_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "MemoryAsset"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "RecognitionEvent_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "Patient"
+            referencedColumns: ["patient_id"]
           },
         ]
       }

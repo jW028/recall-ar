@@ -1,0 +1,3 @@
+export const MIGRATION_V11_PATIENT_PROFILE_PICTURE = `
+  ALTER TABLE Patient ADD COLUMN image_url TEXT;
+`;

@@ -23,7 +23,7 @@ export interface PullSummary {
 }
 
 // Tables pulled from Supabase into local SQLite, in FK-safe order (a parent before anything that references it). Push-only tables are absent.
-const PULL_ORDER: SyncableTable[] = ['Patient', 'MemoryAsset'];
+const PULL_ORDER: SyncableTable[] = ['Patient', 'MemoryAsset', 'Encouragement'];
 
 const EPOCH = '1970-01-01T00:00:00.000Z';
 
