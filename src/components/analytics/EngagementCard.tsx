@@ -25,6 +25,12 @@ export function EngagementCard({ dataset }: Props) {
                     <Text style={styles.label}>Completion rate</Text>
                     <Text style={styles.value}>{Math.round(dataset.completionRate * 100)}%</Text>
                 </View>
+                <View style={styles.stat}>
+                    <Text style={styles.label}>Current streak</Text>
+                    <Text style={styles.value}>
+                        {dataset.currentStreakDays} {dataset.currentStreakDays === 1 ? 'day' : 'days'}
+                    </Text>
+                </View>
             </View>
             <Text style={styles.note}>
                 Engagement is adherence, not performance — low activity makes the biomarkers above less certain.

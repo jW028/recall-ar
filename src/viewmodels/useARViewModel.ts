@@ -1,4 +1,6 @@
 import { AR_LATENCY_BUDGET_MS } from '@/constants/config';
+import { EngagementService } from '@/services/EngagementService';
+import { PairingService } from '@/services/PairingService';
 import { RecognitionService, type RecognitionResult } from '@/services/RecognitionService';
 import { useAuthStore } from '@/store/authStore';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -40,6 +42,8 @@ export function useARViewModel(): ARViewModelResult {
     const isReadyRef = useRef(false);
     const isProcessingRef = useRef(false);
     const isMountedRef = useRef(true);
+    // Pairing patient_id (not the auth user id) — RecognitionEvent rows FK onto Patient.patient_id.
+    const pairedPatientIdRef = useRef<string | null>(null);
 
     const [isCameraActive, setIsCameraActive] = useState(true);
     const recoveryAttemptsRef = useRef(0);
@@ -59,6 +63,10 @@ export function useARViewModel(): ARViewModelResult {
         if (!patientId) return;
 
         isMountedRef.current = true;
+
+        PairingService.getPersistedPairing().then((pairing) => {
+            if (isMountedRef.current) pairedPatientIdRef.current = pairing?.patientId ?? null;
+        });
 
         RecognitionService.initialize(patientId)
             .then(() => {
@@ -114,6 +122,18 @@ export function useARViewModel(): ARViewModelResult {
 
             if (isMountedRef.current) {
                 setResult(recognitionResult);
+            }
+
+            // Fire-and-forget engagement log; day-level de-dupe lives in the service. Never touches SRT scheduling.
+            if (
+                recognitionResult.status === 'recognized' &&
+                recognitionResult.assetId &&
+                pairedPatientIdRef.current
+            ) {
+                EngagementService.recordRecognitionEvent(
+                    pairedPatientIdRef.current,
+                    recognitionResult.assetId
+                );
             }
         } catch {
             // Drop failed captures (camera not yet ready, etc.)

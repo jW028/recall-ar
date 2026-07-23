@@ -8,6 +8,7 @@ import {
 } from '@/constants/config';
 import { getDatabase } from '@/database/local/db';
 import { supabase } from '@/database/remote/supabaseClient';
+import { computeStreak } from '@/utils/streak';
 import type {
     AnalyticsDataset,
     AnalyticsTimeframe,
@@ -122,8 +123,75 @@ function emptyDataset(rangeStart: string, rangeEnd: string): AnalyticsDataset {
         trendDirection: 'stable',
         daysActive: 0,
         completionRate: 0,
+        currentStreakDays: 0,
         sessionsCount: 0,
         distinctDaysCount: 0,
+    };
+}
+
+// Streak lookback (days). Separate from the analytics window so a long streak isn't clamped by the 7/30d timeframe.
+const STREAK_LOOKBACK_DAYS = 120;
+
+// Consecutive-day streak from cloud TrainingSession timestamps, bucketed by UTC day.
+async function fetchStreakDays(assetIds: string[]): Promise<number> {
+    const since = new Date();
+    since.setUTCDate(since.getUTCDate() - STREAK_LOOKBACK_DAYS);
+    const { data, error } = await supabase
+        .from('TrainingSession')
+        .select('timestamp')
+        .in('asset_id', assetIds)
+        .gte('timestamp', since.toISOString());
+    if (error || !data) return 0;
+    const days = (data as { timestamp: string }[]).map((r) => dayOf(r.timestamp));
+    return computeStreak(days, new Date().toISOString().slice(0, 10));
+}
+
+// Lightweight engagement read for the caregiver Overview tab — one bounded cloud query, no full analytics run.
+export interface EngagementSnapshot {
+    streakDays: number;
+    answeredToday: number;
+    lastActiveDay: string | null;
+}
+
+async function getEngagementSnapshot(
+    patientId: string
+): Promise<ServiceResult<EngagementSnapshot>> {
+    let assetIds: string[];
+    try {
+        const db = getDatabase();
+        const rows = await db.getAllAsync<{ asset_id: string }>(
+            `SELECT asset_id FROM MemoryAsset WHERE patient_id = ?`,
+            [patientId]
+        );
+        assetIds = rows.map((r) => r.asset_id);
+    } catch {
+        return { data: null, error: 'Failed to load patient assets.' };
+    }
+
+    if (assetIds.length === 0) {
+        return { data: { streakDays: 0, answeredToday: 0, lastActiveDay: null }, error: null };
+    }
+
+    const since = new Date();
+    since.setUTCDate(since.getUTCDate() - STREAK_LOOKBACK_DAYS);
+    const { data, error } = await supabase
+        .from('TrainingSession')
+        .select('timestamp')
+        .in('asset_id', assetIds)
+        .gte('timestamp', since.toISOString());
+    if (error) {
+        return { data: null, error: 'Failed to load engagement from cloud.' };
+    }
+
+    const days = ((data ?? []) as { timestamp: string }[]).map((r) => dayOf(r.timestamp));
+    const today = new Date().toISOString().slice(0, 10);
+    return {
+        data: {
+            streakDays: computeStreak(days, today),
+            answeredToday: days.filter((d) => d === today).length,
+            lastActiveDay: days.length > 0 ? days.reduce((a, b) => (a > b ? a : b)) : null,
+        },
+        error: null,
     };
 }
 
@@ -257,6 +325,8 @@ async function generateAnalytics(
         trendDirection = 'improving';
     }
 
+    const currentStreakDays = await fetchStreakDays(assetIds);
+
     // Engagement (adherence) from DailyReviewEntry — separate axis from the biomarkers
     const activeDays = new Set(reviews.filter((r) => r.completed).map((r) => r.queue_date));
     const completionRate =
@@ -280,6 +350,7 @@ async function generateAnalytics(
             trendDirection,
             daysActive: activeDays.size,
             completionRate,
+            currentStreakDays,
             sessionsCount,
             distinctDaysCount,
         },
@@ -289,4 +360,5 @@ async function generateAnalytics(
 
 export const AnalyticsService = {
     generateAnalytics,
+    getEngagementSnapshot,
 };

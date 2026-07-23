@@ -41,6 +41,8 @@ export interface AnalyticsDataset {
     // Engagement (adherence) — from DailyReviewEntry, shown distinctly from biomarkers
     daysActive: number;
     completionRate: number; // 0..1
+    // Consecutive-day training streak (UTC days; may differ ±1 from the patient's device-local chip)
+    currentStreakDays: number;
 
     // Data-sufficiency counters (also surfaced to the caregiver)
     sessionsCount: number;
