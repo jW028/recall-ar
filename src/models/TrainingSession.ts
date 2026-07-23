@@ -11,6 +11,12 @@ export interface TrainingSession {
     responseLatencyMs: number | null;
 }
 
+// Result of recording one answer: the attempt row plus whether the asset just graduated to Maintenance.
+export interface SubmitAnswerOutcome {
+    session: TrainingSession;
+    becameMastered: boolean;
+}
+
 // Audit record of what was queued for a day and whether it was finished.
 export interface DailyReviewEntry {
     reviewId: string;

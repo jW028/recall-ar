@@ -5,7 +5,7 @@ import {
 } from '@/constants/config';
 import { getDatabase } from '@/database/local/db';
 import type { MemoryAsset, MemoryAssetStatus } from '@/models/MemoryAsset';
-import type { Question, TrainingSession } from '@/models/TrainingSession';
+import type { Question, SubmitAnswerOutcome, TrainingSession } from '@/models/TrainingSession';
 import * as Crypto from 'expo-crypto';
 import { MemoryAssetService, type ServiceResult } from './MemoryAssetService';
 import type { SyncableTable } from './syncTableConfig';
@@ -206,7 +206,7 @@ async function submitAnswer(
     assetId: string,
     success: boolean,
     responseLatencyMs: number | null
-): Promise<ServiceResult<TrainingSession>> {
+): Promise<ServiceResult<SubmitAnswerOutcome>> {
     const assetResult = await MemoryAssetService.getAssetById(assetId);
     if (assetResult.error || !assetResult.data) {
         return { data: null, error: assetResult.error ?? 'Memory not found.' };
@@ -277,8 +277,11 @@ async function submitAnswer(
     await queueSync('MemoryAsset', assetId, 'UPDATE');
     if (openEntry) await queueSync('DailyReviewEntry', openEntry.review_id, 'UPDATE');
 
+    const session: TrainingSession = {
+        sessionId, assetId, timestamp, intervalMinutes: intervalUsed, success, responseLatencyMs,
+    };
     return {
-        data: { sessionId, assetId, timestamp, intervalMinutes: intervalUsed, success, responseLatencyMs },
+        data: { session, becameMastered: status === 'Maintenance' && asset.status !== 'Maintenance' },
         error: null,
     };
 }

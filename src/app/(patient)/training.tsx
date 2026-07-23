@@ -1,3 +1,6 @@
+import { CorrectCelebration } from '@/components/patient/CorrectCelebration';
+import { SessionProgressBar } from '@/components/patient/SessionProgressBar';
+import { SessionSummaryView } from '@/components/patient/SessionSummaryView';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { isPerson, type MemoryAsset } from '@/models/MemoryAsset';
@@ -9,6 +12,7 @@ import {
     ActivityIndicator,
     Image,
     Pressable,
+    ScrollView,
     StyleSheet,
     Text,
     View,
@@ -21,7 +25,7 @@ export default function TrainingScreen() {
     const styles = useMemo(() => createStyles(theme), [theme]);
     const router = useRouter();
 
-    const { status, error, question, progress, lastResult, isSubmitting, answer, next, markRendered } =
+    const { status, error, question, progress, lastResult, summary, streakDays, isSubmitting, answer, next, markRendered } =
         useTrainingViewModel();
 
     const goHome = () => router.navigate('/(patient)');
@@ -45,19 +49,32 @@ export default function TrainingScreen() {
         );
     }
 
-    if (status === 'empty' || status === 'complete') {
+    if (status === 'complete') {
+        return (
+            <SessionSummaryView
+                summary={summary}
+                streakDays={streakDays}
+                onDone={goHome}
+                onBrowseAlbum={() => router.navigate('/(patient)/album')}
+            />
+        );
+    }
+
+    if (status === 'empty') {
         return (
             <View style={styles.centered}>
-                <Text style={styles.doneTitle}>
-                    {status === 'empty' ? 'All caught up' : 'Great work today'}
-                </Text>
+                <Text style={styles.doneTitle}>All caught up</Text>
                 <Text style={styles.message}>
-                    {status === 'empty'
-                        ? 'There are no memories to review right now. Check back later.'
-                        : "You've finished today's review."}
+                    There are no memories to review right now.
                 </Text>
-                <Pressable style={styles.primaryButton} onPress={goHome}>
-                    <Text style={styles.primaryButtonText}>Done</Text>
+                <Pressable
+                    style={styles.primaryButton}
+                    onPress={() => router.navigate('/(patient)/album')}
+                >
+                    <Text style={styles.primaryButtonText}>Browse your album</Text>
+                </Pressable>
+                <Pressable onPress={goHome} hitSlop={8}>
+                    <Text style={styles.secondaryLink}>Home</Text>
                 </Pressable>
             </View>
         );
@@ -83,49 +100,55 @@ export default function TrainingScreen() {
                     <Ionicons name="chevron-back" size={22} color={theme.primary} />
                     <Text style={styles.backText}>Home</Text>
                 </Pressable>
-                <Text style={styles.progress}>
-                    {progress.current} of {progress.total}
-                </Text>
-            </View>
-
-            <View style={styles.questionArea}>
-                <Image source={{ uri: correctAsset.imageUrl }} style={styles.photo} />
-                <Text style={styles.prompt}>{prompt}</Text>
-            </View>
-
-            {error && !revealed && (
-                <View style={styles.errorBanner}>
-                    <Text style={styles.errorBannerText}>{error}</Text>
+                <View style={styles.progressBar}>
+                    <SessionProgressBar current={progress.current} total={progress.total} />
                 </View>
-            )}
-
-            <View style={styles.choices} onLayout={markRendered}>
-                {choices.map((choice) => (
-                    <ChoiceButton
-                        key={choice.assetId}
-                        choice={choice}
-                        revealed={revealed}
-                        isCorrect={choice.assetId === correctAsset.assetId}
-                        isSelected={lastResult?.selectedAssetId === choice.assetId}
-                        disabled={isSubmitting || revealed}
-                        onPress={() => answer(choice)}
-                        styles={styles}
-                    />
-                ))}
             </View>
 
-            {revealed && (
-                <View style={styles.revealArea}>
-                    <Text style={styles.revealText}>
-                        {lastResult!.correct
-                            ? `That's right — this is ${correctAsset.name}.`
-                            : `Let's remember together — this is ${correctAsset.name}.`}
-                    </Text>
-                    <Pressable style={styles.primaryButton} onPress={next}>
-                        <Text style={styles.primaryButtonText}>Continue</Text>
-                    </Pressable>
+            <ScrollView
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+            >
+                <View style={styles.questionArea}>
+                    <Image source={{ uri: correctAsset.imageUrl }} style={styles.photo} />
+                    <Text style={styles.prompt}>{prompt}</Text>
                 </View>
-            )}
+
+                {error && !revealed && (
+                    <View style={styles.errorBanner}>
+                        <Text style={styles.errorBannerText}>{error}</Text>
+                    </View>
+                )}
+
+                <View style={styles.choices} onLayout={markRendered}>
+                    {choices.map((choice) => (
+                        <ChoiceButton
+                            key={choice.assetId}
+                            choice={choice}
+                            revealed={revealed}
+                            isCorrect={choice.assetId === correctAsset.assetId}
+                            isSelected={lastResult?.selectedAssetId === choice.assetId}
+                            disabled={isSubmitting || revealed}
+                            onPress={() => answer(choice)}
+                            styles={styles}
+                        />
+                    ))}
+                </View>
+
+                {revealed && (
+                    <View style={styles.revealArea}>
+                        {lastResult!.correct && <CorrectCelebration />}
+                        <Text style={styles.revealText}>
+                            {lastResult!.correct
+                                ? `That's right — this is ${correctAsset.name}.`
+                                : `Let's remember together — this is ${correctAsset.name}.`}
+                        </Text>
+                        <Pressable style={styles.primaryButton} onPress={next}>
+                            <Text style={styles.primaryButtonText}>Continue</Text>
+                        </Pressable>
+                    </View>
+                )}
+            </ScrollView>
         </View>
     );
 }
@@ -173,6 +196,10 @@ function createStyles(theme: Theme) {
             flex: 1,
             backgroundColor: theme.surface,
             paddingHorizontal: 24,
+        },
+        // flexGrow keeps the reveal area's marginTop:'auto' pinning Continue to the bottom when content is short, while allowing scroll when it overflows
+        scrollContent: {
+            flexGrow: 1,
             paddingBottom: 32,
         },
         centered: {
@@ -191,7 +218,7 @@ function createStyles(theme: Theme) {
         },
         backButton: { flexDirection: 'row', alignItems: 'center', marginLeft: -4 },
         backText: { fontSize: 16, color: theme.primary, fontWeight: '600' },
-        progress: { fontSize: 15, color: theme.textMuted, fontWeight: '600' },
+        progressBar: { flex: 1, marginLeft: 16 },
         questionArea: {
             alignItems: 'center',
             marginBottom: 28,
@@ -277,6 +304,11 @@ function createStyles(theme: Theme) {
             fontSize: 28,
             fontWeight: '800',
             color: theme.body,
+        },
+        secondaryLink: {
+            fontSize: 16,
+            fontWeight: '600',
+            color: theme.primary,
         },
         message: {
             fontSize: 16,
