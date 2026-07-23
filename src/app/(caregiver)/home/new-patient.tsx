@@ -1,6 +1,8 @@
+import { AvatarPicker } from '@/components/caregiver/AvatarPicker';
 import { FormField } from '@/components/common/FormField';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { PatientService } from '@/services/PatientService';
 import { validate } from '@/utils/validation';
 import { useAuthStore } from '@/store/authStore';
 import { usePatientListViewModel } from '@/viewmodels/usePatientViewModel';
@@ -29,6 +31,9 @@ export default function NewPatientScreen() {
     const [dateOfBirth, setDateOfBirth] = useState('');
     const [emergencyContact, setEmergencyContact] = useState('');
     const [medicalNotes, setMedicalNotes] = useState('');
+    const [avatarUri, setAvatarUri] = useState<string | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
     const [touched, setTouched] = useState({
         patientName: false,
         dateOfBirth: false,
@@ -68,12 +73,27 @@ export default function NewPatientScreen() {
         if (Object.values(errors).some(e => e !== null)) return;
         if (!user?.id) return;
 
+        // Upload the picked avatar first so the created patient carries its URL
+        let imageUrl: string | null = null;
+        if (avatarUri) {
+            setIsUploading(true);
+            setUploadError(null);
+            const result = await PatientService.uploadProfilePicture(user.id, avatarUri);
+            setIsUploading(false);
+            if (result.error || !result.data) {
+                setUploadError(result.error ?? 'Failed to upload photo.');
+                return;
+            }
+            imageUrl = result.data;
+        }
+
         const success = await createPatient({
             caregiverId: user.id,
             patientName: patientName.trim(),
             dateOfBirth,
             emergencyContact: emergencyContact.trim(),
             medicalNotes: medicalNotes.trim() || null,
+            imageUrl,
         });
 
         if (success) router.back();
@@ -95,11 +115,15 @@ export default function NewPatientScreen() {
                     Create a profile to start memory training and AR recognition.
                 </Text>
 
-                {createError && (
+                {(createError || uploadError) && (
                     <View style={styles.errorBox}>
-                        <Text style={styles.errorText}>{createError}</Text>
+                        <Text style={styles.errorText}>{createError ?? uploadError}</Text>
                     </View>
                 )}
+
+                <View style={styles.avatarSection}>
+                    <AvatarPicker value={avatarUri} name={patientName} onChange={setAvatarUri} />
+                </View>
 
                 <FormField
                     label="Full name"
@@ -152,10 +176,10 @@ export default function NewPatientScreen() {
                 <Pressable
                     style={[styles.button, !isFormValid && styles.buttonDisabled]}
                     onPress={handleSubmit}
-                    disabled={!isFormValid || isCreating}
+                    disabled={!isFormValid || isCreating || isUploading}
                 >
                     <Text style={styles.buttonText}>
-                        {isCreating ? 'Saving…' : 'Save patient'}
+                        {isUploading ? 'Uploading photo…' : isCreating ? 'Saving…' : 'Save patient'}
                     </Text>
                 </Pressable>
 
@@ -182,6 +206,7 @@ function createStyles(theme: Theme) {
             marginBottom: 16,
         },
         errorText: { color: theme.error, fontSize: 14 },
+        avatarSection: { alignItems: 'center', marginBottom: 24 },
         field: { marginBottom: 20 },
         label: { fontSize: 14, fontWeight: '600', color: theme.label, marginBottom: 8 },
         input: {

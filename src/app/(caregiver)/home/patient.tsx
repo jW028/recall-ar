@@ -1,5 +1,8 @@
+import { AvatarPicker } from '@/components/caregiver/AvatarPicker';
+import { Avatar } from '@/components/common/Avatar';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { PatientService } from '@/services/PatientService';
 import { useCurrentPatientId } from '@/store/currentPatientStore';
 import { usePatientDetailViewModel } from '@/viewmodels/usePatientViewModel';
 import { useRouter } from 'expo-router';
@@ -38,6 +41,8 @@ export default function PatientDetailScreen() {
     const [dateOfBirth, setDateOfBirth] = useState('');
     const [emergencyContact, setEmergencyContact] = useState('');
     const [medicalNotes, setMedicalNotes] = useState('');
+    const [avatarUri, setAvatarUri] = useState<string | null>(null);
+    const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
     // Sync local form state when patient loads or edit mode toggles on
     useEffect(() => {
@@ -46,6 +51,7 @@ export default function PatientDetailScreen() {
         setDateOfBirth(patient.dateOfBirth);
         setEmergencyContact(patient.emergencyContact);
         setMedicalNotes(patient.medicalNotes ?? '');
+        setAvatarUri(patient.imageUrl);
     }
     }, [patient, isEditing]);
 
@@ -55,11 +61,31 @@ export default function PatientDetailScreen() {
     };
 
     const handleSave = async () => {
+    if (!patient) return;
+
+    // Only touch image_url when the avatar changed; upload freshly picked local uris first
+    let imageUrlParam: string | null | undefined;
+    if (avatarUri !== patient.imageUrl) {
+        if (avatarUri && !avatarUri.startsWith('http')) {
+            setIsUploadingAvatar(true);
+            const result = await PatientService.uploadProfilePicture(patient.patientId, avatarUri);
+            setIsUploadingAvatar(false);
+            if (result.error || !result.data) {
+                Alert.alert('Upload failed', result.error ?? 'Failed to upload photo.');
+                return;
+            }
+            imageUrlParam = result.data;
+        } else {
+            imageUrlParam = avatarUri;
+        }
+    }
+
     const success = await updatePatient({
         patientName,
         dateOfBirth,
         emergencyContact,
         medicalNotes: medicalNotes.trim() || null,
+        ...(imageUrlParam !== undefined ? { imageUrl: imageUrlParam } : {}),
     });
     if (success) setIsEditing(false);
     };
@@ -110,6 +136,12 @@ export default function PatientDetailScreen() {
         <Text style={styles.backButtonText}>‹ Back</Text>
         </Pressable>
 
+        {!isEditing && (
+        <View style={styles.avatarView}>
+            <Avatar imageUrl={patient.imageUrl} name={patient.patientName} size={96} />
+        </View>
+        )}
+
         <View style={styles.header}>
         <Text style={styles.title}>{patient.patientName}</Text>
         {!isEditing && (
@@ -145,6 +177,10 @@ export default function PatientDetailScreen() {
         {/* Edit mode */}
         {isEditing && (
         <View style={styles.detailsCard}>
+            <View style={styles.avatarEdit}>
+            <AvatarPicker value={avatarUri} name={patientName} onChange={setAvatarUri} />
+            </View>
+
             <View style={styles.field}>
             <Text style={styles.label}>Full name</Text>
             <TextInput
@@ -193,10 +229,10 @@ export default function PatientDetailScreen() {
             <Pressable
                 style={styles.saveButton}
                 onPress={handleSave}
-                disabled={isUpdating}
+                disabled={isUpdating || isUploadingAvatar}
             >
                 <Text style={styles.saveButtonText}>
-                {isUpdating ? 'Saving…' : 'Save'}
+                {isUploadingAvatar ? 'Uploading…' : isUpdating ? 'Saving…' : 'Save'}
                 </Text>
             </Pressable>
             </View>
@@ -258,6 +294,8 @@ function createStyles(theme: Theme) {
     },
     backButton: { alignSelf: 'flex-start', marginBottom: 16 },
     backButtonText: { fontSize: 16, color: theme.primary, fontWeight: '600' },
+    avatarView: { alignItems: 'center', marginBottom: 20 },
+    avatarEdit: { alignItems: 'center', marginBottom: 20 },
     header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
