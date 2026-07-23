@@ -1,5 +1,6 @@
 import { AnalyticsEmptyState } from '@/components/analytics/AnalyticsEmptyState';
 import { DegradationBanner } from '@/components/analytics/DegradationBanner';
+import { EncouragementPanel } from '@/components/analytics/EncouragementPanel';
 import { EngagementCard } from '@/components/analytics/EngagementCard';
 import { SummaryCard } from '@/components/analytics/SummaryCard';
 import { TimeframeSelector } from '@/components/analytics/TimeframeSelector';
@@ -95,6 +96,8 @@ function OverviewTab({
             contentContainerStyle={styles.container}
             refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} />}
         >
+            <EncouragementPanel patientId={patientId} />
+
             <Text style={styles.poolCount}>
                 {activeCount} of {MAX_MONTHLY_POOL_SIZE} active
             </Text>
