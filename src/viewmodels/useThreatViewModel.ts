@@ -1,4 +1,5 @@
 import type { Threat } from '@/models/Threat';
+import { SyncService } from '@/services/SyncService';
 import { ThreatService } from '@/services/ThreatService';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -24,10 +25,13 @@ export function useThreatListViewModel(
         setIsLoading(true);
         setError(null);
 
-        // 1. Pull the latest threats from Supabase first
+        // 1. Push any local updates first so they aren't overwritten by stale cloud data
+        await SyncService.drainQueue();
+
+        // 2. Pull the latest threats from Supabase
         await ThreatService.pullThreatsFromCloud(patientId);
 
-        // 2. Load them from local SQLite
+        // 3. Load them from local SQLite
         const result = await ThreatService.getThreatsByPatient(patientId);
         if (result.error) {
             setError(result.error);
