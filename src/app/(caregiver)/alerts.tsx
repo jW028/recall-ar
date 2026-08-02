@@ -204,8 +204,8 @@ export default function ThreatListScreen() {
                                             </Pressable>
                                         </View>
 
-                                        {/* View Location Button for Panic alerts */}
-                                        {item.threatType === 'Panic Button' && (
+                                        {/* View Location Button for Panic and Fall alerts */}
+                                        {(item.threatType === 'Panic Button' || item.threatType === 'Fall Detected') && (
                                             <Pressable
                                                 style={[styles.ackButton, { backgroundColor: theme.primarySoft, marginTop: 0 }]}
                                                 onPress={() => setShowLocationTab(true)}

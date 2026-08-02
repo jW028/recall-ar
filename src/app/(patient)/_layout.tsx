@@ -1,11 +1,30 @@
 import { AppTabBar } from '@/components/common/AppTabBar';
+import { FallAlertModal } from '@/components/patient/FallAlertModal';
 import { ThemeSchemeContext } from '@/hooks/use-theme';
+import { useFallDetectionViewModel } from '@/viewmodels/useFallDetectionViewModel';
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
+import { useEffect } from 'react';
 
 
 // Patient app is always light mode
 export default function PatientLayout() {
+    const {
+        fallState,
+        countdownSeconds,
+        enableMonitoring,
+        disableMonitoring,
+        cancelFallAlert,
+        triggerImmediateSOS,
+    } = useFallDetectionViewModel();
+
+    useEffect(() => {
+        enableMonitoring();
+        return () => {
+            disableMonitoring();
+        };
+    }, [enableMonitoring, disableMonitoring]);
+
     return (
         <ThemeSchemeContext.Provider value="light">
             <Tabs
@@ -49,6 +68,15 @@ export default function PatientLayout() {
                     }}
                 />
             </Tabs>
+
+            <FallAlertModal
+                visible={fallState !== 'idle'}
+                countdownSeconds={countdownSeconds}
+                fallState={fallState}
+                onCancel={cancelFallAlert}
+                onImmediateSOS={triggerImmediateSOS}
+            />
         </ThemeSchemeContext.Provider>
     );
 }
+
