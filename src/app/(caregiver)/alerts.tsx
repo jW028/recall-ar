@@ -1,3 +1,4 @@
+import { CurrentPatientChip } from '@/components/caregiver/CurrentPatientChip';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useCurrentPatientId } from '@/store/currentPatientStore';
@@ -127,6 +128,10 @@ export default function ThreatListScreen() {
                         <Text style={{ color: theme.error, fontWeight: '600', fontSize: 13 }}>Clear History</Text>
                     </Pressable>
                 )}
+            </View>
+
+            <View style={{ flexDirection: 'row', marginTop: -8, marginBottom: 20 }}>
+                <CurrentPatientChip />
             </View>
 
             {threats.length === 0 ? (

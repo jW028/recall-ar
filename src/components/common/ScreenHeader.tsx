@@ -12,10 +12,12 @@ interface ScreenHeaderProps {
     showBack?: boolean;
     onBack?: () => void;
     right?: ReactNode;
+    // Context row rendered under the title, e.g. the current patient chip
+    chip?: ReactNode;
 }
 
 // Consistent screen header with safe-area top padding and optional back button
-export function ScreenHeader({ title, subtitle, showBack, onBack, right }: ScreenHeaderProps) {
+export function ScreenHeader({ title, subtitle, showBack, onBack, right, chip }: ScreenHeaderProps) {
     const theme = useTheme();
     const insets = useSafeAreaInsets();
     const router = useRouter();
@@ -45,6 +47,7 @@ export function ScreenHeader({ title, subtitle, showBack, onBack, right }: Scree
                 </View>
                 {right ? <View style={styles.right}>{right}</View> : null}
             </View>
+            {chip ? <View style={styles.chipRow}>{chip}</View> : null}
         </View>
     );
 }
@@ -81,6 +84,10 @@ function createStyles(theme: Theme) {
             flexDirection: 'row',
             alignItems: 'center',
             gap: 8,
+        },
+        chipRow: {
+            flexDirection: 'row',
+            marginTop: 10,
         },
     });
 }

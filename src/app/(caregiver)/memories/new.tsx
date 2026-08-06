@@ -10,7 +10,7 @@ import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { validate } from '@/utils/validation';
 import { FormField } from '@/components/common/FormField';
 import { SuggestionField } from '@/components/common/SuggestionField';
-import { useCurrentPatientId } from '@/store/currentPatientStore';
+import { useCurrentPatient, useCurrentPatientId } from '@/store/currentPatientStore';
 import { useEnrollmentViewModel } from '@/viewmodels/useMemoryAssetViewModel';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
@@ -31,6 +31,7 @@ type AssetType = 'Person' | 'Object';
 
 export default function NewAssetScreen() {
     const patientId = useCurrentPatientId() ?? undefined;
+    const currentPatient = useCurrentPatient();
     const router = useRouter();
     const theme = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
@@ -71,9 +72,11 @@ export default function NewAssetScreen() {
         existingObjectCategories.includes(category.trim().toLowerCase());
 
     const isProcessing = step === 'processing' || step === 'saving';
+    // Name the patient at the point of commitment so a wrong-patient enrollment is caught before it happens
     const submitLabel =
         step === 'processing' ? 'Processing photos…' :
         step === 'saving' ? 'Saving…' :
+        currentPatient ? `Enroll for ${currentPatient.patientName}` :
         'Enroll memory';
 
     const canPress = canSubmit && isOnline && !isProcessing && isFormValid;

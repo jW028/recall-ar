@@ -36,22 +36,43 @@ export default function CaregiverHomeScreen() {
     const user = useAuthStore((s) => s.user);
     const currentPatientId = useCurrentPatientId();
     const setCurrentPatient = useCurrentPatientStore((s) => s.setCurrentPatient);
+    const syncFromList = useCurrentPatientStore((s) => s.syncFromList);
 
     const { patients, isLoading, refresh: refreshPatients } = usePatientListViewModel(user?.id);
 
-    // Auto-select a valid current patient whenever the list changes
+    // Auto-select a valid current patient whenever the list changes, refreshing the cached name and photo
     useEffect(() => {
         if (patients.length === 0) return;
         const stillValid = currentPatientId && patients.some((p) => p.patientId === currentPatientId);
-        if (!stillValid) setCurrentPatient(patients[0].patientId);
-    }, [patients, currentPatientId, setCurrentPatient]);
+        if (stillValid) {
+            syncFromList(patients);
+            return;
+        }
+        const fallback = patients[0];
+        setCurrentPatient(fallback.patientId, {
+            patientName: fallback.patientName,
+            imageUrl: fallback.imageUrl,
+        });
+    }, [patients, currentPatientId, setCurrentPatient, syncFromList]);
+
+    // Carry the name and photo into the store so every other screen's header can label itself
+    const selectPatient = useCallback(
+        (patientId: string) => {
+            const next = patients.find((p) => p.patientId === patientId);
+            setCurrentPatient(
+                patientId,
+                next ? { patientName: next.patientName, imageUrl: next.imageUrl } : undefined
+            );
+        },
+        [patients, setCurrentPatient]
+    );
 
     const currentPatient = useMemo(
         () => patients.find((p) => p.patientId === currentPatientId) ?? null,
         [patients, currentPatientId]
     );
 
-    const { assets, refresh } = useMemoryAssetListViewModel(currentPatient?.patientId);
+    const { assets, refresh, isLoading: isLoadingAssets } = useMemoryAssetListViewModel(currentPatient?.patientId);
     const { dataset, exportReport, isExporting, exportMessage, exportError, clearExportMessage } =
         useAnalyticsViewModel(currentPatient?.patientId);
 
@@ -183,9 +204,9 @@ export default function CaregiverHomeScreen() {
                 <CurrentPatientCard
                     patients={patients}
                     currentPatientId={currentPatientId}
-                    onSelect={setCurrentPatient}
+                    onSelect={selectPatient}
                     onViewEdit={() => router.push('/(caregiver)/home/patient')}
-                    onChange={() => router.push('/(caregiver)/home/select-patient')}
+                    onAddPatient={() => router.push('/(caregiver)/home/new-patient')}
                 />
 
                 <View style={[styles.threatCard, activeThreatsCount > 0 && styles.threatCardActive]}>
@@ -201,6 +222,23 @@ export default function CaregiverHomeScreen() {
                         </Pressable>
                     )}
                 </View>
+
+                {/* The tiles below all read zero until something is enrolled, so name the next step outright */}
+                {!isLoadingAssets && assets.length === 0 && (
+                    <View style={styles.setupCallout}>
+                        <Text style={styles.setupTitle}>Enroll the first memory</Text>
+                        <Text style={styles.setupBody}>
+                            {currentPatient?.patientName ?? 'This patient'} has nothing to train on yet. Add a
+                            person or object, then pair their device so they can start reviewing.
+                        </Text>
+                        <Button
+                            label="Enroll a memory"
+                            icon="add"
+                            onPress={() => router.push('/(caregiver)/memories/new')}
+                            style={styles.setupButton}
+                        />
+                    </View>
+                )}
 
                 <View style={styles.row}>
                     <StatTile
@@ -249,17 +287,13 @@ export default function CaregiverHomeScreen() {
                 />
 
 
-                <Text style={styles.sectionTitle}>Quick Actions</Text>
+                {/* Only destinations with no tab or header entry of their own belong here */}
+                <Text style={styles.sectionTitle}>Setup & Reports</Text>
                 <View style={styles.actions}>
                     <ActionRow
-                        icon="add-circle-outline"
-                        label="Enroll Memory"
-                        onPress={() => router.push('/(caregiver)/memories/new')}
-                    />
-                    <ActionRow
-                        icon="people-outline"
-                        label="Switch Patient"
-                        onPress={() => router.push('/(caregiver)/home/select-patient')}
+                        icon="shield-checkmark-outline"
+                        label="Add Safe Zone"
+                        onPress={() => router.push('/(caregiver)/location/create')}
                     />
                     <ActionRow
                         icon="phone-portrait-outline"
@@ -270,6 +304,11 @@ export default function CaregiverHomeScreen() {
                         icon="document-text-outline"
                         label="Export Medical Report"
                         onPress={handleExport}
+                    />
+                    <ActionRow
+                        icon="help-circle-outline"
+                        label="User Guide & FAQ"
+                        onPress={() => router.push('/(caregiver)/home/user-guide')}
                     />
                 </View>
             </ScrollView>
@@ -322,6 +361,27 @@ function createStyles(theme: Theme) {
             fontWeight: '800',
             color: theme.heading,
             marginTop: 8,
+        },
+        setupCallout: {
+            backgroundColor: theme.primaryMuted,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: theme.primarySoft,
+            padding: 18,
+        },
+        setupTitle: {
+            fontSize: 17,
+            fontWeight: '700',
+            color: theme.heading,
+            marginBottom: 6,
+        },
+        setupBody: {
+            fontSize: 14,
+            lineHeight: 20,
+            color: theme.bodySecondary,
+        },
+        setupButton: {
+            marginTop: 14,
         },
         actions: {
             gap: 12,

@@ -88,8 +88,11 @@ export default function PatientListScreen() {
 
   const goToNewPatient = () => router.push('/(caregiver)/home/new-patient');
   // Choose the active patient and return to the dashboard
-  const selectPatient = (patientId: string) => {
-    setCurrentPatient(patientId);
+  const selectPatient = (patient: Patient) => {
+    setCurrentPatient(patient.patientId, {
+      patientName: patient.patientName,
+      imageUrl: patient.imageUrl,
+    });
     router.back();
   };
 
@@ -133,7 +136,7 @@ export default function PatientListScreen() {
           <PatientCard
             patient={item}
             selected={item.patientId === currentPatientId}
-            onPress={() => selectPatient(item.patientId)}
+            onPress={() => selectPatient(item)}
             styles={styles}
             theme={theme}
           />

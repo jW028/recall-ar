@@ -1,3 +1,4 @@
+import { CurrentPatientChip } from '@/components/caregiver/CurrentPatientChip';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useCurrentPatientId } from '@/store/currentPatientStore';
@@ -285,13 +286,18 @@ export default function GeofenceListScreen() {
     return (
         <View style={styles.container}>
             <View style={styles.header}>
-                <Pressable onPress={() => router.back()} style={styles.headerButton}>
-                    <Text style={styles.headerIcon}>←</Text>
-                </Pressable>
-                <Text style={styles.headerTitle}>Location Tracking</Text>
-                <Pressable onPress={() => setIsSettingsOpen(true)} style={styles.headerButton}>
-                    <Text style={{ fontSize: 16, fontWeight: '600', color: theme.primary }}>Edit</Text>
-                </Pressable>
+                <View style={styles.headerRow}>
+                    <Pressable onPress={() => router.back()} style={styles.headerButton}>
+                        <Text style={styles.headerIcon}>←</Text>
+                    </Pressable>
+                    <Text style={styles.headerTitle}>Location Tracking</Text>
+                    <Pressable onPress={() => setIsSettingsOpen(true)} style={styles.headerButton}>
+                        <Text style={{ fontSize: 16, fontWeight: '600', color: theme.primary }}>Edit</Text>
+                    </Pressable>
+                </View>
+                <View style={styles.headerChip}>
+                    <CurrentPatientChip />
+                </View>
             </View>
 
             <ScrollView 
@@ -489,15 +495,21 @@ function createStyles(theme: Theme) {
             backgroundColor: '#F8FAFC',
         },
         header: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
             paddingTop: 56,
             paddingBottom: 12,
             paddingHorizontal: 16,
             backgroundColor: '#FFFFFF',
             borderBottomWidth: 1,
             borderBottomColor: theme.border,
+        },
+        headerRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+        },
+        headerChip: {
+            flexDirection: 'row',
+            marginTop: 10,
         },
         headerTitle: {
             fontSize: 18,

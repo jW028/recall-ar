@@ -1,8 +1,7 @@
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { useCurrentPatientId } from '@/store/currentPatientStore';
+import { useCurrentPatient, useCurrentPatientId } from '@/store/currentPatientStore';
 import { useDevicePairingViewModel } from '@/viewmodels/useDevicePairingViewModel';
-import { usePatientDetailViewModel } from '@/viewmodels/usePatientViewModel';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo } from 'react';
 import { ActivityIndicator, Clipboard, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -20,7 +19,8 @@ export default function PairDeviceScreen() {
     const theme = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
 
-    const { patient } = usePatientDetailViewModel(id);
+    // The cached summary already carries the name, so the header needs no extra fetch
+    const patient = useCurrentPatient();
     const {
     pairingToken,
     isGenerating,
