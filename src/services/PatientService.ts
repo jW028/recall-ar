@@ -263,47 +263,10 @@ async function uploadProfilePicture(
     }
 }
 
-// Sync with cloud on first login / new device
-async function pullPatientsFromCloud(
-    caregiverId: string
-  ): Promise<ServiceResult<number>> {
-    const { data: rows, error: fetchError } = await supabase
-      .from('Patient')
-      .select('*')
-      .eq('caregiver_id', caregiverId);
-
-    if (fetchError) {
-      return { data: null, error: 'Failed to sync patients from cloud.' };
-    }
-
-    const db = getDatabase();
-    let count = 0;
-
-    await db.withExclusiveTransactionAsync(async () => {
-      for (const row of rows ?? []) {
-        await db.runAsync(
-          `INSERT OR REPLACE INTO Patient
-            (patient_id, caregiver_id, patient_name, date_of_birth, medical_notes, emergency_contact, image_url, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            row.patient_id,
-            row.caregiver_id,
-            row.patient_name,
-            row.date_of_birth,
-            row.medical_notes,
-            row.emergency_contact,
-            row.image_url ?? null,
-            row.created_at,
-            row.updated_at,
-          ]
-        );
-        count++;
-      }
-    });
-
-    return { data: count, error: null };
-}
-
+// Patients are pulled by SyncService.pullAllForCaregiver, which applies the pending-write guard
+// and the last-write-wins check. The hand-rolled pullPatientsFromCloud that used to live here did
+// neither — it INSERT OR REPLACEd every row on every mount, silently discarding local edits that
+// had not been pushed yet.
 
 export const PatientService = {
     createPatient,
@@ -312,5 +275,4 @@ export const PatientService = {
     updatePatient,
     deletePatient,
     uploadProfilePicture,
-    pullPatientsFromCloud,
 };
