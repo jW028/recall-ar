@@ -13,12 +13,13 @@ import { MIGRATION_V8_EMBEDDING_MODEL } from './migrations/v8_embedding_model';
 import { MIGRATION_V9_RECOGNITION_EVENT } from './migrations/v9_recognition_event';
 import { MIGRATION_V10_ENCOURAGEMENT } from './migrations/v10_encouragement';
 import { MIGRATION_V11_PATIENT_PROFILE_PICTURE } from './migrations/v11_patient_profile_picture';
+import { MIGRATION_V12_SYNC_STATE_SCOPE } from './migrations/v12_sync_state_scope';
 import { CREATE_TABLES } from './schema';
 
 const DATABASE_NAME = 'recallar.db';
 
 // Bump this number when a new migration is added in the MIGRATIONS array
-const LATEST_VERSION = 11;
+const LATEST_VERSION = 12;
 
 
 interface Migration {
@@ -82,6 +83,11 @@ const MIGRATIONS: Migration[] = [
         version: 11,
         description: 'Add image_url profile picture column to Patient',
         sql: MIGRATION_V11_PATIENT_PROFILE_PICTURE,
+    },
+    {
+        version: 12,
+        description: 'Key SyncState watermarks by pull scope',
+        sql: MIGRATION_V12_SYNC_STATE_SCOPE,
     },
 ]
 
