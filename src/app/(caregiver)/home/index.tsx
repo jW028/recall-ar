@@ -223,6 +223,23 @@ export default function CaregiverHomeScreen() {
                     )}
                 </View>
 
+                {/* The tiles below all read zero until something is enrolled, so name the next step outright */}
+                {!isLoadingAssets && assets.length === 0 && (
+                    <View style={styles.setupCallout}>
+                        <Text style={styles.setupTitle}>Enroll the first memory</Text>
+                        <Text style={styles.setupBody}>
+                            {currentPatient?.patientName ?? 'This patient'} has nothing to train on yet. Add a
+                            person or object, then pair their device so they can start reviewing.
+                        </Text>
+                        <Button
+                            label="Enroll a memory"
+                            icon="add"
+                            onPress={() => router.push('/(caregiver)/memories/new')}
+                            style={styles.setupButton}
+                        />
+                    </View>
+                )}
+
                 <View style={styles.row}>
                     <StatTile
                         value={objectCount}
@@ -270,17 +287,13 @@ export default function CaregiverHomeScreen() {
                 />
 
 
-                <Text style={styles.sectionTitle}>Quick Actions</Text>
+                {/* Only destinations with no tab or header entry of their own belong here */}
+                <Text style={styles.sectionTitle}>Setup & Reports</Text>
                 <View style={styles.actions}>
                     <ActionRow
-                        icon="add-circle-outline"
-                        label="Enroll Memory"
-                        onPress={() => router.push('/(caregiver)/memories/new')}
-                    />
-                    <ActionRow
-                        icon="people-outline"
-                        label="Switch Patient"
-                        onPress={() => router.push('/(caregiver)/home/select-patient')}
+                        icon="shield-checkmark-outline"
+                        label="Add Safe Zone"
+                        onPress={() => router.push('/(caregiver)/location/create')}
                     />
                     <ActionRow
                         icon="phone-portrait-outline"
@@ -291,6 +304,11 @@ export default function CaregiverHomeScreen() {
                         icon="document-text-outline"
                         label="Export Medical Report"
                         onPress={handleExport}
+                    />
+                    <ActionRow
+                        icon="help-circle-outline"
+                        label="User Guide & FAQ"
+                        onPress={() => router.push('/(caregiver)/home/user-guide')}
                     />
                 </View>
             </ScrollView>
@@ -343,6 +361,27 @@ function createStyles(theme: Theme) {
             fontWeight: '800',
             color: theme.heading,
             marginTop: 8,
+        },
+        setupCallout: {
+            backgroundColor: theme.primaryMuted,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: theme.primarySoft,
+            padding: 18,
+        },
+        setupTitle: {
+            fontSize: 17,
+            fontWeight: '700',
+            color: theme.heading,
+            marginBottom: 6,
+        },
+        setupBody: {
+            fontSize: 14,
+            lineHeight: 20,
+            color: theme.bodySecondary,
+        },
+        setupButton: {
+            marginTop: 14,
         },
         actions: {
             gap: 12,
