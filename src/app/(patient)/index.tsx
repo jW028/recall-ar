@@ -4,6 +4,7 @@ import { EncouragementBanner } from '@/components/patient/EncouragementBanner';
 import { StreakChip } from '@/components/patient/StreakChip';
 import { TodayMoments } from '@/components/patient/TodayMoments';
 import type { Theme } from '@/constants/theme';
+import { useCaregiverName } from '@/hooks/useCaregiverName';
 import { useTheme } from '@/hooks/use-theme';
 import { LocationService } from '@/services/LocationService';
 import { PairingService } from '@/services/PairingService';
@@ -25,6 +26,7 @@ export default function PatientHomeScreen() {
     const [isSigningOut, setIsSigningOut] = useState(false);
     const { streakDays, recognitions, encouragement, dismissEncouragement } =
         usePatientHomeViewModel();
+    const caregiverName = useCaregiverName();
 
     // ── Publish GPS location every 30 s while app is open ──────────
     useEffect(() => {
@@ -107,7 +109,10 @@ export default function PatientHomeScreen() {
                 console.warn('[PatientHome] Caregiver push token not found');
             }
 
-            Alert.alert("Emergency Broadcasted", "Your caregiver has been notified of your location.");
+            Alert.alert(
+                "Emergency Broadcasted",
+                `${caregiverName ?? 'Your caregiver'} has been notified of your location.`
+            );
         } catch (e) {
             console.error(e);
             Alert.alert("Error", "Could not send emergency alert.");
@@ -122,7 +127,11 @@ export default function PatientHomeScreen() {
                     Point the camera at a face or object to identify it, or review your memories.
                 </Text>
 
-                <EncouragementBanner encouragement={encouragement} onDismiss={dismissEncouragement} />
+                <EncouragementBanner
+                    encouragement={encouragement}
+                    caregiverName={caregiverName}
+                    onDismiss={dismissEncouragement}
+                />
 
                 <StreakChip days={streakDays} />
 

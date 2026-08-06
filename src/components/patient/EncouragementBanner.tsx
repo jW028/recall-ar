@@ -8,11 +8,13 @@ import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } fr
 
 interface Props {
     encouragement: Encouragement | null;
+    // Null until the paired caregiver's name resolves, or when it cannot be read at all.
+    caregiverName: string | null;
     onDismiss: () => void;
 }
 
 // Warm banner for a caregiver message on the patient home screen. Gone once dismissed; never nags.
-export function EncouragementBanner({ encouragement, onDismiss }: Props) {
+export function EncouragementBanner({ encouragement, caregiverName, onDismiss }: Props) {
     const theme = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
     const opacity = useSharedValue(0);
@@ -36,7 +38,9 @@ export function EncouragementBanner({ encouragement, onDismiss }: Props) {
         <Animated.View style={[styles.card, animatedStyle]}>
             <View style={styles.headerRow}>
                 <Ionicons name="heart" size={18} color={theme.primary} />
-                <Text style={styles.heading}>A message from your caregiver</Text>
+                <Text style={styles.heading}>
+                    A message from {caregiverName ?? 'your caregiver'}
+                </Text>
             </View>
             <Text style={styles.message}>
                 {encouragement.emoji ? `${encouragement.emoji} ` : ''}
