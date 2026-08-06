@@ -3,11 +3,14 @@ import { useTheme } from '@/hooks/use-theme';
 import { useCurrentPatientId } from '@/store/currentPatientStore';
 import { usePatientLocationViewModel } from '@/viewmodels/useGeofenceViewModels';
 import { useThreatListViewModel } from '@/viewmodels/useThreatViewModel';
+import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
+    Alert,
     FlatList,
+    Modal,
     Platform,
     Pressable,
     StyleSheet,
@@ -16,16 +19,31 @@ import {
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
-
 function MiniMap({ patientId }: { patientId: string }) {
     const { fetchLocation } = usePatientLocationViewModel(patientId);
-    const [coords, setCoords] = useState<{ lat: number, lng: number } | null>(null);
+    const [coords, setCoords] = useState<{ lat: number, lng: number, recordedAt?: string } | null>(null);
+    const [locationName, setLocationName] = useState<string | null>(null);
 
     useEffect(() => {
         let mounted = true;
-        fetchLocation().then(res => {
+        fetchLocation().then(async (res) => {
             if (mounted && res.found && res.location) {
-                setCoords({ lat: res.location.latitude, lng: res.location.longitude });
+                const lat = res.location.latitude;
+                const lng = res.location.longitude;
+                setCoords({ lat, lng, recordedAt: res.location.recordedAt });
+
+                try {
+                    const geocode = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+                    if (geocode && geocode.length > 0 && mounted) {
+                        const address = geocode[0];
+                        const name = address.name || address.street || address.city || address.region;
+                        if (name) {
+                            setLocationName(name);
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Reverse geocoding failed', e);
+                }
             }
         });
         return () => { mounted = false };
@@ -34,19 +52,36 @@ function MiniMap({ patientId }: { patientId: string }) {
     if (!coords) return <ActivityIndicator style={{ margin: 16 }} />;
 
     return (
-        <View style={{ height: 140, borderRadius: 8, overflow: 'hidden', marginTop: 12 }}>
-            <MapView
-                style={StyleSheet.absoluteFillObject}
-                provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-                initialRegion={{
-                    latitude: coords.lat,
-                    longitude: coords.lng,
-                    latitudeDelta: 0.005,
-                    longitudeDelta: 0.005
-                }}
-            >
-                <Marker coordinate={{ latitude: coords.lat, longitude: coords.lng }} title="Current Location" pinColor='blue' />
-            </MapView>
+        <View style={{ marginTop: 12 }}>
+            <View style={{ marginBottom: 12 }}>
+                {locationName && (
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: '#1E293B', marginBottom: 4 }}>
+                        Patient is nearby {locationName}
+                    </Text>
+                )}
+                <Text style={{ fontSize: 14, color: '#64748B' }}>
+                    Coordinates: {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
+                </Text>
+                {coords.recordedAt && (
+                    <Text style={{ fontSize: 14, color: '#64748B' }}>
+                        Last Updated: {new Date(coords.recordedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}
+                    </Text>
+                )}
+            </View>
+            <View style={{ height: 200, borderRadius: 12, overflow: 'hidden' }}>
+                <MapView
+                    style={StyleSheet.absoluteFillObject}
+                    provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+                    initialRegion={{
+                        latitude: coords.lat,
+                        longitude: coords.lng,
+                        latitudeDelta: 0.005,
+                        longitudeDelta: 0.005
+                    }}
+                >
+                    <Marker coordinate={{ latitude: coords.lat, longitude: coords.lng }} title="Current Location" pinColor='red' />
+                </MapView>
+            </View>
         </View>
     )
 }
@@ -59,6 +94,8 @@ export default function ThreatListScreen() {
 
     const { threats, isLoading, error, refresh, acknowledgeThreat, resolveThreat, clearHistory } =
         useThreatListViewModel(patientId);
+
+    const [showLocationTab, setShowLocationTab] = useState(false);
 
     if (isLoading) {
         return (
@@ -136,7 +173,7 @@ export default function ThreatListScreen() {
 
                                 <View style={styles.detailRow}>
                                     <Text style={styles.detailLabel}>Status</Text>
-                                    <Text style={styles.detailValue}>{item.threatStatus}</Text>
+                                    <Text style={styles.detailValue}>{isResolved ? 'Resolved' : item.threatStatus}</Text>
                                 </View>
                                 <View style={styles.detailRow}>
                                     <Text style={styles.detailLabel}>Detected</Text>
@@ -158,7 +195,10 @@ export default function ThreatListScreen() {
                                         <View style={{ flexDirection: 'row', gap: 10 }}>
                                             <Pressable
                                                 style={[styles.ackButton, { flex: 1, backgroundColor: theme.success || '#10B981', marginTop: 0 }]}
-                                                onPress={() => resolveThreat(item.threatId)}
+                                                onPress={async () => {
+                                                    const success = await resolveThreat(item.threatId);
+                                                    if (!success) Alert.alert('Error', 'Failed to resolve the threat. Please try again.');
+                                                }}
                                             >
                                                 <Text style={styles.ackButtonText}>Resolve</Text>
                                             </Pressable>
@@ -168,7 +208,7 @@ export default function ThreatListScreen() {
                                         {item.threatType === 'Panic Button' && (
                                             <Pressable
                                                 style={[styles.ackButton, { backgroundColor: theme.primarySoft, marginTop: 0 }]}
-                                                onPress={() => router.push(`/(caregiver)/location`)}
+                                                onPress={() => setShowLocationTab(true)}
                                             >
                                                 <Text style={[styles.ackButtonText, { color: theme.primary }]}>View Live Location</Text>
                                             </Pressable>
@@ -180,6 +220,40 @@ export default function ThreatListScreen() {
                     }}
                 />
             )}
+
+            <Modal
+                visible={showLocationTab}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setShowLocationTab(false)}
+            >
+                <View style={styles.bottomSheetOverlay}>
+                    <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowLocationTab(false)} />
+                    <View style={styles.bottomSheetContainer}>
+                        <View style={styles.bottomSheetDragHandle} />
+                        <View style={styles.bottomSheetHeader}>
+                            <Text style={styles.bottomSheetTitle}>Patient Live Location</Text>
+                            <Pressable onPress={() => setShowLocationTab(false)} style={styles.closeButton}>
+                                <Text style={styles.closeButtonText}>Close</Text>
+                            </Pressable>
+                        </View>
+                        {patientId ? (
+                            <View style={{ paddingBottom: 16 }}>
+                                <MiniMap patientId={patientId} />
+                                <Pressable
+                                    style={[styles.ackButton, { backgroundColor: theme.primarySoft, marginTop: 16 }]}
+                                    onPress={() => {
+                                        setShowLocationTab(false);
+                                        router.push(`/(caregiver)/location`);
+                                    }}
+                                >
+                                    <Text style={[styles.ackButtonText, { color: theme.primary }]}>View More Detail</Text>
+                                </Pressable>
+                            </View>
+                        ) : <Text style={styles.detailValue}>Location not available</Text>}
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -305,5 +379,47 @@ function createStyles(theme: Theme) {
             fontSize: 15,
             textAlign: 'center',
         },
+        bottomSheetOverlay: {
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.4)',
+            justifyContent: 'flex-end',
+        },
+        bottomSheetContainer: {
+            backgroundColor: theme.surface,
+            borderTopLeftRadius: 20,
+            borderTopRightRadius: 20,
+            padding: 24,
+            paddingTop: 12,
+            paddingBottom: 40,
+            minHeight: 350,
+        },
+        bottomSheetDragHandle: {
+            width: 40,
+            height: 5,
+            backgroundColor: '#CBD5E1',
+            borderRadius: 3,
+            alignSelf: 'center',
+            marginBottom: 16,
+        },
+        bottomSheetHeader: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+        },
+        bottomSheetTitle: {
+            fontSize: 18,
+            fontWeight: '700',
+            color: theme.heading,
+        },
+        closeButton: {
+            paddingVertical: 4,
+            paddingHorizontal: 8,
+        },
+        closeButtonText: {
+            fontSize: 15,
+            fontWeight: '600',
+            color: theme.primary,
+        },
     });
 }
+

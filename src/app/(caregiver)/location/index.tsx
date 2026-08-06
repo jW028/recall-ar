@@ -2,6 +2,7 @@ import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useCurrentPatientId } from '@/store/currentPatientStore';
 import { useGeofenceListViewModel, usePatientGeofenceEventsViewModel, usePatientLocationViewModel } from '@/viewmodels/useGeofenceViewModels';
+import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -10,11 +11,11 @@ import {
     Modal,
     Platform,
     Pressable,
+    RefreshControl,
     ScrollView,
     StyleSheet,
     Text,
-    TextInput,
-    View,
+    View
 } from 'react-native';
 import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
@@ -25,8 +26,8 @@ function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: num
     const dp = (lat2 - lat1) * Math.PI / 180;
     const dl = (lon2 - lon1) * Math.PI / 180;
     const a = Math.sin(dp / 2) * Math.sin(dp / 2) +
-              Math.cos(p1) * Math.cos(p2) *
-              Math.sin(dl / 2) * Math.sin(dl / 2);
+        Math.cos(p1) * Math.cos(p2) *
+        Math.sin(dl / 2) * Math.sin(dl / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
 }
@@ -63,8 +64,76 @@ export default function GeofenceListScreen() {
         isLive: boolean;
         label: string;
         recordedAt?: string;
+        locationName?: string;
     } | null>(null);
     const mapRef = useRef<MapView>(null);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+
+    const handleRefreshLocation = async () => {
+        setIsRefreshing(true);
+        refreshGeofences();
+        refreshEvents();
+        try {
+            const { found, isLive, location } = await fetchLocation();
+
+            if (found && location) {
+                let locationName: string | undefined = undefined;
+                try {
+                    const geocode = await Location.reverseGeocodeAsync({
+                        latitude: location.latitude,
+                        longitude: location.longitude
+                    });
+                    if (geocode && geocode.length > 0) {
+                        const address = geocode[0];
+                        const name = address.name || address.street || address.city || address.region;
+                        locationName = name ? name : undefined;
+                    }
+                } catch (e) { }
+
+                // Animate map to the patient's position
+                mapRef.current?.animateToRegion({
+                    latitude: location.latitude,
+                    longitude: location.longitude,
+                    latitudeDelta: 0.005,
+                    longitudeDelta: 0.005,
+                }, 800);
+                setPatientMarker({
+                    latitude: location.latitude,
+                    longitude: location.longitude,
+                    isLive,
+                    label: isLive ? '📍 Patient (Live)' : '📍 Last Known Area',
+                    recordedAt: location.recordedAt,
+                    locationName,
+                });
+            } else if (!found) {
+                // Fallback: navigate to most recent event's geofence center
+                const lastEvent = events[0];
+                if (lastEvent) {
+                    const lat = lastEvent.geofence.centerLatitude;
+                    const lon = lastEvent.geofence.centerLongitude;
+                    mapRef.current?.animateToRegion({
+                        latitude: lat,
+                        longitude: lon,
+                        latitudeDelta: 0.005,
+                        longitudeDelta: 0.005,
+                    }, 800);
+                    setPatientMarker({
+                        latitude: lat,
+                        longitude: lon,
+                        isLive: false,
+                        label: `📍 Last seen near ${lastEvent.geofence.geofenceType}`,
+                    });
+                } else {
+                    Alert.alert(
+                        'No Location Data',
+                        'No location or geofence activity found for this patient yet.'
+                    );
+                }
+            }
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
 
     const handleDelete = (geofenceId: string, label: string) => {
         Alert.alert(
@@ -84,7 +153,7 @@ export default function GeofenceListScreen() {
     // Calculate initial region bounding box based on geofences
     const initialRegion = useMemo(() => {
         if (geofences.length === 0) {
-            return { latitude: 3.139, longitude: 101.6869, latitudeDelta: 0.1, longitudeDelta: 0.1 };
+            return { latitude: 3.139, longitude: 101.6869, latitudeDelta: 0.005, longitudeDelta: 0.005 };
         }
 
         let minLat = geofences[0].centerLatitude;
@@ -99,8 +168,8 @@ export default function GeofenceListScreen() {
             if (g.centerLongitude > maxLon) maxLon = g.centerLongitude;
         }
 
-        const latDelta = Math.max(maxLat - minLat, 0.05) * 1.5;
-        const lonDelta = Math.max(maxLon - minLon, 0.05) * 1.5;
+        const latDelta = Math.max(maxLat - minLat, 0.005) * 1.5;
+        const lonDelta = Math.max(maxLon - minLon, 0.005) * 1.5;
 
         return {
             latitude: (minLat + maxLat) / 2,
@@ -122,22 +191,40 @@ export default function GeofenceListScreen() {
         (async () => {
             const { found, isLive, location } = await fetchLocation();
             if (found && location && mounted) {
-                setPatientMarker({
-                    latitude: location.latitude,
-                    longitude: location.longitude,
-                    isLive,
-                    label: isLive ? '📍 Patient (Live)' : '📍 Last Known Area',
-                    recordedAt: location.recordedAt,
-                });
-                
-                // Animate to patient location once loaded
-                if (mapRef.current) {
-                    mapRef.current.animateToRegion({
+                let locationName: string | undefined = undefined;
+                try {
+                    const geocode = await Location.reverseGeocodeAsync({
+                        latitude: location.latitude,
+                        longitude: location.longitude
+                    });
+                    if (geocode && geocode.length > 0 && mounted) {
+                        const address = geocode[0];
+                        const name = address.name || address.street || address.city || address.region;
+                        locationName = name ? name : undefined;
+                    }
+                } catch (e) {
+                    console.warn('Reverse geocoding failed', e);
+                }
+
+                if (mounted) {
+                    setPatientMarker({
                         latitude: location.latitude,
                         longitude: location.longitude,
-                        latitudeDelta: 0.05,
-                        longitudeDelta: 0.05,
-                    }, 800);
+                        isLive,
+                        label: isLive ? '📍 Patient (Live)' : '📍 Last Known Area',
+                        recordedAt: location.recordedAt,
+                        locationName,
+                    });
+
+                    // Animate to patient location once loaded
+                    if (mapRef.current) {
+                        mapRef.current.animateToRegion({
+                            latitude: location.latitude,
+                            longitude: location.longitude,
+                            latitudeDelta: 0.005,
+                            longitudeDelta: 0.005,
+                        }, 800);
+                    }
                 }
             }
         })();
@@ -145,7 +232,7 @@ export default function GeofenceListScreen() {
     }, [fetchLocation]);
 
     const latestEvent = events.length > 0 ? events[0] : null;
-    
+
     // Default to event-based safety status
     let isSafe: boolean | null = latestEvent ? (latestEvent.event.eventType === 'Enter') : null;
     let referenceZone = latestEvent?.geofence.geofenceType || null;
@@ -166,14 +253,14 @@ export default function GeofenceListScreen() {
                 break;
             }
         }
-        
+
         if (currentlyInZone) {
             isSafe = true;
             referenceZone = currentlyInZone;
         } else {
             isSafe = false;
         }
-        
+
         lastUpdated = patientMarker.recordedAt
             ? new Date(patientMarker.recordedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })
             : new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
@@ -203,17 +290,27 @@ export default function GeofenceListScreen() {
                 </Pressable>
                 <Text style={styles.headerTitle}>Location Tracking</Text>
                 <Pressable onPress={() => setIsSettingsOpen(true)} style={styles.headerButton}>
-                    <Text style={styles.headerIcon}>✏️</Text>
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: theme.primary }}>Edit</Text>
                 </Pressable>
             </View>
 
-            <ScrollView contentContainerStyle={styles.content}>
+            <ScrollView 
+                contentContainerStyle={styles.content}
+                refreshControl={
+                    <RefreshControl refreshing={isRefreshing} onRefresh={handleRefreshLocation} tintColor={theme.primary} colors={[theme.primary]} />
+                }
+            >
                 {/* Status Card */}
                 <View style={[styles.statusCard, { borderLeftColor: statusColor }]}>
                     <View style={styles.statusTitleRow}>
                         <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
                         <Text style={[styles.statusTitle, { color: statusColor }]}>{statusText}</Text>
                     </View>
+                    {patientMarker?.locationName && (
+                        <Text style={[styles.statusSubtitle, { marginBottom: 4, fontWeight: '500', color: '#1E293B' }]}>
+                            Nearby: {patientMarker.locationName}
+                        </Text>
+                    )}
                     <Text style={styles.statusSubtitle}>Last updated: {lastUpdated}</Text>
                 </View>
 
@@ -266,53 +363,7 @@ export default function GeofenceListScreen() {
                     <Pressable
                         style={[styles.trackButton, isTracking && styles.trackButtonLoading]}
                         disabled={isTracking}
-                        onPress={async () => {
-                            refreshGeofences();
-                            refreshEvents();
-
-                            const { found, isLive, location } = await fetchLocation();
-
-                            if (found && location) {
-                                // Animate map to the patient's position
-                                mapRef.current?.animateToRegion({
-                                    latitude: location.latitude,
-                                    longitude: location.longitude,
-                                    latitudeDelta: 0.01,
-                                    longitudeDelta: 0.01,
-                                }, 800);
-                                setPatientMarker({
-                                    latitude: location.latitude,
-                                    longitude: location.longitude,
-                                    isLive,
-                                    label: isLive ? '📍 Patient (Live)' : '📍 Last Known Area',
-                                    recordedAt: location.recordedAt,
-                                });
-                            } else if (!found) {
-                                // Fallback: navigate to most recent event's geofence center
-                                const lastEvent = events[0];
-                                if (lastEvent) {
-                                    const lat = lastEvent.geofence.centerLatitude;
-                                    const lon = lastEvent.geofence.centerLongitude;
-                                    mapRef.current?.animateToRegion({
-                                        latitude: lat,
-                                        longitude: lon,
-                                        latitudeDelta: 0.05,
-                                        longitudeDelta: 0.05,
-                                    }, 800);
-                                    setPatientMarker({
-                                        latitude: lat,
-                                        longitude: lon,
-                                        isLive: false,
-                                        label: `📍 Last seen near ${lastEvent.geofence.geofenceType}`,
-                                    });
-                                } else {
-                                    Alert.alert(
-                                        'No Location Data',
-                                        'No location or geofence activity found for this patient yet.'
-                                    );
-                                }
-                            }
-                        }}
+                        onPress={handleRefreshLocation}
                     >
                         {isTracking
                             ? <Text style={styles.trackButtonText}>Locating…</Text>

@@ -13,10 +13,11 @@ import { useCurrentPatientId, useCurrentPatientStore } from '@/store/currentPati
 import { useAnalyticsViewModel } from '@/viewmodels/useAnalyticsViewModel';
 import { useMemoryAssetListViewModel } from '@/viewmodels/useMemoryAssetViewModel';
 import { usePatientListViewModel } from '@/viewmodels/usePatientViewModel';
+import { useThreatListViewModel } from '@/viewmodels/useThreatViewModel';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // First and last non-null smoothed values of a daily series, or null if too few
@@ -36,7 +37,7 @@ export default function CaregiverHomeScreen() {
     const currentPatientId = useCurrentPatientId();
     const setCurrentPatient = useCurrentPatientStore((s) => s.setCurrentPatient);
 
-    const { patients, isLoading } = usePatientListViewModel(user?.id);
+    const { patients, isLoading, refresh: refreshPatients } = usePatientListViewModel(user?.id);
 
     // Auto-select a valid current patient whenever the list changes
     useEffect(() => {
@@ -53,6 +54,8 @@ export default function CaregiverHomeScreen() {
     const { assets, refresh } = useMemoryAssetListViewModel(currentPatient?.patientId);
     const { dataset, exportReport, isExporting, exportMessage, exportError, clearExportMessage } =
         useAnalyticsViewModel(currentPatient?.patientId);
+
+    const { threats, refresh: refreshThreats } = useThreatListViewModel(currentPatient?.patientId);
 
     // Surface export result once, then clear so it doesn't fire again on re-render
     useEffect(() => {
@@ -71,15 +74,32 @@ export default function CaregiverHomeScreen() {
         exportReport();
     }, [isExporting, dataset, exportReport]);
 
+    const [isRefreshing, setIsRefreshing] = useState(false);
+
+    const handleRefresh = useCallback(async () => {
+        setIsRefreshing(true);
+        try {
+            await Promise.all([
+                refresh(),
+                refreshThreats(),
+                refreshPatients()
+            ]);
+        } finally {
+            setIsRefreshing(false);
+        }
+    }, [refresh, refreshThreats, refreshPatients]);
+
     // Re-fetch counts when returning to this screen (e.g. after enrolling a memory) since the home stays mounted
     useFocusEffect(
         useCallback(() => {
             refresh();
-        }, [refresh])
+            refreshThreats();
+        }, [refresh, refreshThreats])
     );
 
     const peopleCount = assets.filter(isPerson).length;
     const objectCount = assets.filter(isObject).length;
+    const activeThreatsCount = threats.filter(t => t.alertStatus !== 'Resolved').length;
 
     const accuracy = useMemo(() => {
         if (!dataset?.hasData || dataset.currentAccuracy == null) return null;
@@ -154,7 +174,12 @@ export default function CaregiverHomeScreen() {
                 </Pressable>
             </View>
 
-            <ScrollView contentContainerStyle={styles.content}>
+            <ScrollView 
+                contentContainerStyle={styles.content}
+                refreshControl={
+                    <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={theme.primary} colors={[theme.primary]} />
+                }
+            >
                 <CurrentPatientCard
                     patients={patients}
                     currentPatientId={currentPatientId}
@@ -162,6 +187,20 @@ export default function CaregiverHomeScreen() {
                     onViewEdit={() => router.push('/(caregiver)/home/patient')}
                     onChange={() => router.push('/(caregiver)/home/select-patient')}
                 />
+
+                <View style={[styles.threatCard, activeThreatsCount > 0 && styles.threatCardActive]}>
+                    <View style={styles.threatCardHeader}>
+                        <Ionicons name="warning" size={24} color={activeThreatsCount > 0 ? theme.error : theme.textMuted} />
+                        <Text style={[styles.threatCardTitle, activeThreatsCount > 0 && { color: theme.error }]}>
+                            {activeThreatsCount} Ongoing Threat{activeThreatsCount !== 1 ? 's' : ''}
+                        </Text>
+                    </View>
+                    {activeThreatsCount > 0 && (
+                        <Pressable style={styles.threatButton} onPress={() => router.push('/(caregiver)/alerts')}>
+                            <Text style={styles.threatButtonText}>View Alerts</Text>
+                        </Pressable>
+                    )}
+                </View>
 
                 <View style={styles.row}>
                     <StatTile
@@ -286,6 +325,47 @@ function createStyles(theme: Theme) {
         },
         actions: {
             gap: 12,
+        },
+        threatCard: {
+            backgroundColor: '#FFFFFF',
+            borderRadius: 16,
+            padding: 16,
+            marginBottom: 8,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.05,
+            shadowRadius: 4,
+            elevation: 1,
+            borderWidth: 1,
+            borderColor: 'transparent',
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+        },
+        threatCardActive: {
+            borderColor: theme.error,
+            backgroundColor: '#FEF2F2',
+        },
+        threatCardHeader: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+        },
+        threatCardTitle: {
+            fontSize: 16,
+            fontWeight: '700',
+            color: theme.heading,
+        },
+        threatButton: {
+            backgroundColor: theme.error,
+            paddingHorizontal: 16,
+            paddingVertical: 8,
+            borderRadius: 8,
+        },
+        threatButtonText: {
+            color: '#FFFFFF',
+            fontWeight: '700',
+            fontSize: 14,
         },
     });
 }
