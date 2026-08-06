@@ -36,22 +36,43 @@ export default function CaregiverHomeScreen() {
     const user = useAuthStore((s) => s.user);
     const currentPatientId = useCurrentPatientId();
     const setCurrentPatient = useCurrentPatientStore((s) => s.setCurrentPatient);
+    const syncFromList = useCurrentPatientStore((s) => s.syncFromList);
 
     const { patients, isLoading, refresh: refreshPatients } = usePatientListViewModel(user?.id);
 
-    // Auto-select a valid current patient whenever the list changes
+    // Auto-select a valid current patient whenever the list changes, refreshing the cached name and photo
     useEffect(() => {
         if (patients.length === 0) return;
         const stillValid = currentPatientId && patients.some((p) => p.patientId === currentPatientId);
-        if (!stillValid) setCurrentPatient(patients[0].patientId);
-    }, [patients, currentPatientId, setCurrentPatient]);
+        if (stillValid) {
+            syncFromList(patients);
+            return;
+        }
+        const fallback = patients[0];
+        setCurrentPatient(fallback.patientId, {
+            patientName: fallback.patientName,
+            imageUrl: fallback.imageUrl,
+        });
+    }, [patients, currentPatientId, setCurrentPatient, syncFromList]);
+
+    // Carry the name and photo into the store so every other screen's header can label itself
+    const selectPatient = useCallback(
+        (patientId: string) => {
+            const next = patients.find((p) => p.patientId === patientId);
+            setCurrentPatient(
+                patientId,
+                next ? { patientName: next.patientName, imageUrl: next.imageUrl } : undefined
+            );
+        },
+        [patients, setCurrentPatient]
+    );
 
     const currentPatient = useMemo(
         () => patients.find((p) => p.patientId === currentPatientId) ?? null,
         [patients, currentPatientId]
     );
 
-    const { assets, refresh } = useMemoryAssetListViewModel(currentPatient?.patientId);
+    const { assets, refresh, isLoading: isLoadingAssets } = useMemoryAssetListViewModel(currentPatient?.patientId);
     const { dataset, exportReport, isExporting, exportMessage, exportError, clearExportMessage } =
         useAnalyticsViewModel(currentPatient?.patientId);
 
@@ -183,9 +204,9 @@ export default function CaregiverHomeScreen() {
                 <CurrentPatientCard
                     patients={patients}
                     currentPatientId={currentPatientId}
-                    onSelect={setCurrentPatient}
+                    onSelect={selectPatient}
                     onViewEdit={() => router.push('/(caregiver)/home/patient')}
-                    onChange={() => router.push('/(caregiver)/home/select-patient')}
+                    onAddPatient={() => router.push('/(caregiver)/home/new-patient')}
                 />
 
                 <View style={[styles.threatCard, activeThreatsCount > 0 && styles.threatCardActive]}>

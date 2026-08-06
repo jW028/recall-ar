@@ -1,6 +1,7 @@
+import { CurrentPatientChip } from '@/components/caregiver/CurrentPatientChip';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { useCurrentPatientId } from '@/store/currentPatientStore';
+import { useCurrentPatient, useCurrentPatientId } from '@/store/currentPatientStore';
 import { useGeofenceListViewModel } from '@/viewmodels/useGeofenceViewModels';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
@@ -59,6 +60,7 @@ function regionForRadius(lat: number, lon: number, radiusM: number): Region {
 // ─────────────────────────────────────────────────────────────────
 export default function GeofenceCreateScreen() {
     const patientId = useCurrentPatientId() ?? undefined;
+    const currentPatient = useCurrentPatient();
     const router = useRouter();
     const theme = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
@@ -210,7 +212,8 @@ export default function GeofenceCreateScreen() {
         });
         
         if (ok) {
-            Alert.alert('Saved', 'Safe zone created successfully.', [
+            const forPatient = currentPatient ? ` for ${currentPatient.patientName}` : '';
+            Alert.alert('Saved', `Safe zone created successfully${forPatient}.`, [
                 { text: 'OK', onPress: () => router.back() },
             ]);
         }
@@ -223,20 +226,25 @@ export default function GeofenceCreateScreen() {
         <View style={styles.root}>
             {/* ── Top header bar ──────────────────────────────── */}
             <View style={styles.header}>
-                <Pressable style={styles.headerBack} onPress={() => router.back()}>
-                    <Text style={styles.headerBackText}>← Back</Text>
-                </Pressable>
-                <Text style={styles.headerTitle}>Configure Safe Zone</Text>
-                <Pressable
-                    style={[styles.saveBtn, isUpdating && styles.saveBtnDisabled]}
-                    onPress={handleSave}
-                    disabled={isUpdating}
-                >
-                    {isUpdating
-                        ? <ActivityIndicator size="small" color={theme.onPrimary} />
-                        : <Text style={styles.saveBtnText}>Save</Text>
-                    }
-                </Pressable>
+                <View style={styles.headerRow}>
+                    <Pressable style={styles.headerBack} onPress={() => router.back()}>
+                        <Text style={styles.headerBackText}>← Back</Text>
+                    </Pressable>
+                    <Text style={styles.headerTitle}>Configure Safe Zone</Text>
+                    <Pressable
+                        style={[styles.saveBtn, isUpdating && styles.saveBtnDisabled]}
+                        onPress={handleSave}
+                        disabled={isUpdating}
+                    >
+                        {isUpdating
+                            ? <ActivityIndicator size="small" color={theme.onPrimary} />
+                            : <Text style={styles.saveBtnText}>Save</Text>
+                        }
+                    </Pressable>
+                </View>
+                <View style={styles.headerChip}>
+                    <CurrentPatientChip />
+                </View>
             </View>
 
             <ScrollView
@@ -478,15 +486,21 @@ function createStyles(theme: Theme) {
         },
         // ── Header ──────────────────────────────────────────────
         header: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
             paddingTop: 56,
             paddingBottom: 12,
             paddingHorizontal: 16,
             backgroundColor: theme.surface,
             borderBottomWidth: 1,
             borderBottomColor: theme.border,
+        },
+        headerRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+        },
+        headerChip: {
+            flexDirection: 'row',
+            marginTop: 10,
         },
         headerBack: {
             paddingVertical: 6,

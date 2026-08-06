@@ -3,7 +3,7 @@ import { Avatar } from '@/components/common/Avatar';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { PatientService } from '@/services/PatientService';
-import { useCurrentPatientId } from '@/store/currentPatientStore';
+import { useCurrentPatientId, useCurrentPatientStore } from '@/store/currentPatientStore';
 import { usePatientDetailViewModel } from '@/viewmodels/usePatientViewModel';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
@@ -20,6 +20,7 @@ import {
 
 export default function PatientDetailScreen() {
     const id = useCurrentPatientId() ?? undefined;
+    const setCurrentPatient = useCurrentPatientStore((s) => s.setCurrentPatient);
     const router = useRouter();
     const theme = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
@@ -87,7 +88,16 @@ export default function PatientDetailScreen() {
         medicalNotes: medicalNotes.trim() || null,
         ...(imageUrlParam !== undefined ? { imageUrl: imageUrlParam } : {}),
     });
-    if (success) setIsEditing(false);
+    if (success) {
+        // Keep the cached header summary in step with a rename or a new photo
+        if (id) {
+            setCurrentPatient(id, {
+                patientName,
+                imageUrl: imageUrlParam !== undefined ? imageUrlParam : (patient?.imageUrl ?? null),
+            });
+        }
+        setIsEditing(false);
+    }
     };
 
     const handleCancel = () => setIsEditing(false);

@@ -1,10 +1,12 @@
 import { AnalyticsEmptyState } from '@/components/analytics/AnalyticsEmptyState';
+import { CurrentPatientChip } from '@/components/caregiver/CurrentPatientChip';
 import { DegradationBanner } from '@/components/analytics/DegradationBanner';
 import { EncouragementPanel } from '@/components/analytics/EncouragementPanel';
 import { EngagementCard } from '@/components/analytics/EngagementCard';
 import { SummaryCard } from '@/components/analytics/SummaryCard';
 import { TimeframeSelector } from '@/components/analytics/TimeframeSelector';
 import { TrendChart } from '@/components/analytics/TrendChart';
+import { Button } from '@/components/common/Button';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Screen } from '@/components/common/Screen';
 import { ScreenHeader } from '@/components/common/ScreenHeader';
@@ -48,7 +50,7 @@ export default function TrainingScreen() {
 
     return (
         <Screen>
-            <ScreenHeader title="Training" />
+            <ScreenHeader title="Training" chip={<CurrentPatientChip />} />
             <View style={styles.segmentBar}>
                 <View style={styles.segmentRow}>
                     {(['overview', 'analytics'] as const).map((value) => {
