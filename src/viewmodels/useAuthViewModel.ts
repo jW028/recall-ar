@@ -40,7 +40,7 @@ export function useAuthViewModel(): UseAuthViewModel {
 
             setUser(result.data);
             setIsSubmitting(false);
-            router.replace('/(caregiver)');
+            router.replace('/(caregiver)/home');
         },
         [router, setUser]
     );
@@ -68,7 +68,7 @@ export function useAuthViewModel(): UseAuthViewModel {
 
             setUser(result.data);
             setIsSubmitting(false);
-            router.replace('/(caregiver)');
+            router.replace('/(caregiver)/home');
         },
         [router, setUser]
     );
