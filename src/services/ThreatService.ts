@@ -161,9 +161,18 @@ async function pullThreatsFromCloud(
 
     await db.withExclusiveTransactionAsync(async () => {
         for (const row of rows ?? []) {
+            // ON CONFLICT DO UPDATE, never INSERT OR REPLACE — the latter deletes and reinserts the row rather than updating it in place.
             await db.runAsync(
-                `INSERT OR REPLACE INTO Threat (threat_id, patient_id, threat_type, detected_time, threat_status, alert_status, alert_time, acknowledged_time)
-                VALUES(?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO Threat (threat_id, patient_id, threat_type, detected_time, threat_status, alert_status, alert_time, acknowledged_time)
+                VALUES(?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(threat_id) DO UPDATE SET
+                    patient_id = excluded.patient_id,
+                    threat_type = excluded.threat_type,
+                    detected_time = excluded.detected_time,
+                    threat_status = excluded.threat_status,
+                    alert_status = excluded.alert_status,
+                    alert_time = excluded.alert_time,
+                    acknowledged_time = excluded.acknowledged_time`,
                 [
                     row.threat_id,
                     row.patient_id,

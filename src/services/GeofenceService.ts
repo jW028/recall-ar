@@ -267,9 +267,16 @@ async function pullGeofencesFromCloud(
 
     await db.withExclusiveTransactionAsync(async () => {
         for (const row of rows ?? []) {
+            // ON CONFLICT DO UPDATE, never INSERT OR REPLACE: the latter deletes and reinserts the row, which would cascade away child GeofenceEvent rows once foreign keys are enforced.
             await db.runAsync(
-                `INSERT OR REPLACE INTO Geofence (geofence_id, patient_id, center_latitude, center_longitude, radius_meters, geofence_type)
-                VALUES (?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO Geofence (geofence_id, patient_id, center_latitude, center_longitude, radius_meters, geofence_type)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(geofence_id) DO UPDATE SET
+                    patient_id = excluded.patient_id,
+                    center_latitude = excluded.center_latitude,
+                    center_longitude = excluded.center_longitude,
+                    radius_meters = excluded.radius_meters,
+                    geofence_type = excluded.geofence_type`,
                 [
                     row.geofence_id,
                     row.patient_id,
