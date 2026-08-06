@@ -35,6 +35,10 @@ export function useGeofenceListViewModel(
         if (!patientId) return;
         setIsLoading(true);
         setError(null);
+
+        // Geofence has no updated_at column, so it can't join the watermarked pull in SyncService. Pull the full set first, the same way useThreatViewModel does, otherwise geofences created on another device never reach this one. Best-effort: offline falls back to whatever is already local.
+        await GeofenceService.pullGeofencesFromCloud(patientId).catch(() => {});
+
         const result = await GeofenceService.getGeofencesByPatient(patientId);
         if (result.error) {
             setError(result.error);
