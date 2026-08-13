@@ -30,7 +30,7 @@ export default function AccountScreen() {
 
     return (
         <Screen background="page">
-            <ScreenHeader title="Account" />
+            <ScreenHeader title="Account" showBack />
             <ScrollView contentContainerStyle={styles.content}>
                 <View style={styles.profileCard}>
                     <View style={styles.avatar}>
@@ -58,11 +58,6 @@ export default function AccountScreen() {
                 </View>
 
                 <Text style={styles.sectionLabel}>Help & Legal</Text>
-                <ActionRow
-                    icon="help-circle-outline"
-                    label="User Guide & FAQ"
-                    onPress={() => router.push('/(caregiver)/home/user-guide')}
-                />
                 <ActionRow
                     icon="shield-checkmark-outline"
                     label="Privacy Declaration"

@@ -1,5 +1,7 @@
 import { AvatarPicker } from '@/components/caregiver/AvatarPicker';
 import { Avatar } from '@/components/common/Avatar';
+import { Screen } from '@/components/common/Screen';
+import { ScreenHeader } from '@/components/common/ScreenHeader';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { PatientService } from '@/services/PatientService';
@@ -126,40 +128,45 @@ export default function PatientDetailScreen() {
 
     if (isLoading && !patient) {
     return (
+        <Screen>
+        <ScreenHeader title="Patient" showBack />
         <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.primary} />
+            <ActivityIndicator size="large" color={theme.primary} />
         </View>
+        </Screen>
     );
     }
 
     if (error || !patient) {
     return (
+        <Screen>
+        <ScreenHeader title="Patient" showBack />
         <View style={styles.loadingContainer}>
-        <Text style={styles.errorText}>{error ?? 'Patient not found.'}</Text>
+            <Text style={styles.errorText}>{error ?? 'Patient not found.'}</Text>
         </View>
+        </Screen>
     );
     }
 
     return (
-    <ScrollView contentContainerStyle={styles.container}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-        <Text style={styles.backButtonText}>‹ Back</Text>
-        </Pressable>
-
+    <Screen>
+        <ScreenHeader
+        title={patient.patientName}
+        showBack
+        right={
+            !isEditing ? (
+            <Pressable onPress={() => setIsEditing(true)} hitSlop={6}>
+                <Text style={styles.editLink}>Edit</Text>
+            </Pressable>
+            ) : null
+        }
+        />
+        <ScrollView contentContainerStyle={styles.container}>
         {!isEditing && (
         <View style={styles.avatarView}>
             <Avatar imageUrl={patient.imageUrl} name={patient.patientName} size={96} />
         </View>
         )}
-
-        <View style={styles.header}>
-        <Text style={styles.title}>{patient.patientName}</Text>
-        {!isEditing && (
-            <Pressable onPress={() => setIsEditing(true)}>
-            <Text style={styles.editLink}>Edit</Text>
-            </Pressable>
-        )}
-        </View>
 
         {updateError && (
         <View style={styles.errorBox}>
@@ -267,7 +274,8 @@ export default function PatientDetailScreen() {
             </Pressable>
         </>
         )}
-    </ScrollView>
+        </ScrollView>
+    </Screen>
     );
 }
 
@@ -292,32 +300,16 @@ function createStyles(theme: Theme) {
     return StyleSheet.create({
     container: {
     padding: 24,
-    paddingTop: 56,
-    backgroundColor: theme.surface,
+    paddingTop: 16,
     flexGrow: 1,
     },
     loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.surface,
     },
-    backButton: { alignSelf: 'flex-start', marginBottom: 16 },
-    backButtonText: { fontSize: 16, color: theme.primary, fontWeight: '600' },
     avatarView: { alignItems: 'center', marginBottom: 20 },
     avatarEdit: { alignItems: 'center', marginBottom: 20 },
-    header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-    },
-    title: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: theme.body,
-    flex: 1,
-    },
     editLink: {
     fontSize: 15,
     fontWeight: '600',

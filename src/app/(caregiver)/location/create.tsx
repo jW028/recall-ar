@@ -1,4 +1,6 @@
 import { CurrentPatientChip } from '@/components/caregiver/CurrentPatientChip';
+import { Screen } from '@/components/common/Screen';
+import { ScreenHeader } from '@/components/common/ScreenHeader';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useCurrentPatient, useCurrentPatientId } from '@/store/currentPatientStore';
@@ -223,14 +225,11 @@ export default function GeofenceCreateScreen() {
     const initialRegion = { latitude: 3.139, longitude: 101.6869, latitudeDelta: 0.05, longitudeDelta: 0.07 };
 
     return (
-        <View style={styles.root}>
-            {/* ── Top header bar ──────────────────────────────── */}
-            <View style={styles.header}>
-                <View style={styles.headerRow}>
-                    <Pressable style={styles.headerBack} onPress={() => router.back()}>
-                        <Text style={styles.headerBackText}>← Back</Text>
-                    </Pressable>
-                    <Text style={styles.headerTitle}>Configure Safe Zone</Text>
+        <Screen background="page">
+            <ScreenHeader
+                title="New Safe Zone"
+                showBack
+                right={
                     <Pressable
                         style={[styles.saveBtn, isUpdating && styles.saveBtnDisabled]}
                         onPress={handleSave}
@@ -241,11 +240,9 @@ export default function GeofenceCreateScreen() {
                             : <Text style={styles.saveBtnText}>Save</Text>
                         }
                     </Pressable>
-                </View>
-                <View style={styles.headerChip}>
-                    <CurrentPatientChip />
-                </View>
-            </View>
+                }
+                chip={<CurrentPatientChip />}
+            />
 
             <ScrollView
                 contentContainerStyle={styles.scroll}
@@ -473,52 +470,13 @@ export default function GeofenceCreateScreen() {
 
                 <View style={{ height: 40 }} />
             </ScrollView>
-        </View>
+        </Screen>
     );
 }
 
 // ─────────────────────────────────────────────────────────────────
 function createStyles(theme: Theme) {
     return StyleSheet.create({
-        root: {
-            flex: 1,
-            backgroundColor: theme.pageBackground,
-        },
-        // ── Header ──────────────────────────────────────────────
-        header: {
-            paddingTop: 56,
-            paddingBottom: 12,
-            paddingHorizontal: 16,
-            backgroundColor: theme.surface,
-            borderBottomWidth: 1,
-            borderBottomColor: theme.border,
-        },
-        headerRow: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-        },
-        headerChip: {
-            flexDirection: 'row',
-            marginTop: 10,
-        },
-        headerBack: {
-            paddingVertical: 6,
-            paddingRight: 12,
-            minWidth: 64,
-        },
-        headerBackText: {
-            fontSize: 15,
-            color: theme.primary,
-            fontWeight: '500',
-        },
-        headerTitle: {
-            fontSize: 16,
-            fontWeight: '700',
-            color: theme.heading,
-            flex: 1,
-            textAlign: 'center',
-        },
         saveBtn: {
             backgroundColor: theme.primary,
             paddingHorizontal: 18,
