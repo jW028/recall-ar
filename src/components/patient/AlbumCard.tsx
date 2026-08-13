@@ -1,6 +1,8 @@
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { StrengthRing } from '@/components/patient/StrengthRing';
 import { isPerson, type MemoryAsset } from '@/models/MemoryAsset';
+import { memoryStrength } from '@/utils/memoryStrength';
 import { Ionicons } from '@expo/vector-icons';
 import { useMemo } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -32,11 +34,13 @@ export function AlbumCard({ asset, onPress }: Props) {
                     <Text style={styles.name}>{asset.name}</Text>
                     <Text style={styles.subtitle}>{subtitle}</Text>
                 </View>
-                {asset.status === 'Maintenance' && (
-                    <View style={styles.starBadge}>
-                        <Ionicons name="star" size={20} color={theme.warning} />
-                    </View>
-                )}
+                {/* Segments fill as the memory is remembered over time, with the star arriving once
+                    it has graduated. A growth indicator, never a rank or a score. */}
+                <StrengthRing filled={memoryStrength(asset)}>
+                    {asset.status === 'Maintenance' && (
+                        <Ionicons name="star" size={18} color={theme.warning} />
+                    )}
+                </StrengthRing>
             </View>
         </Pressable>
     );
@@ -77,14 +81,6 @@ function createStyles(theme: Theme) {
         subtitle: {
             fontSize: 15,
             color: theme.textMuted,
-        },
-        starBadge: {
-            width: 40,
-            height: 40,
-            borderRadius: 20,
-            backgroundColor: theme.primarySoft,
-            alignItems: 'center',
-            justifyContent: 'center',
         },
     });
 }

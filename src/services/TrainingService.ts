@@ -2,6 +2,7 @@ import {
     MASTERY_STREAK_THRESHOLD,
     MAX_DAILY_QUESTIONS,
     ONBOARDING_INTERVALS_MINUTES,
+    PRACTICE_SESSION_SIZE,
 } from '@/constants/config';
 import { getDatabase } from '@/database/local/db';
 import type { MemoryAsset, MemoryAssetStatus } from '@/models/MemoryAsset';
@@ -168,6 +169,50 @@ async function buildSessionQueue(
     }
 }
 
+// How many memories are waiting right now. Same predicate as buildSessionQueue, and capped the same
+// way, so the home screen never promises more than a session would actually deliver.
+async function getDueCount(patientId: string): Promise<ServiceResult<number>> {
+    const db = getDatabase();
+    try {
+        const row = await db.getFirstAsync<{ due: number }>(
+            `SELECT COUNT(*) AS due FROM MemoryAsset
+            WHERE patient_id = ? AND status != 'Paused' AND next_review <= ?`,
+            [patientId, nowIso()]
+        );
+        return { data: Math.min(row?.due ?? 0, MAX_DAILY_QUESTIONS), error: null };
+    } catch {
+        return { data: null, error: 'Failed to count memories due.' };
+    }
+}
+
+// Optional extra practice once the due queue is empty, drawn from graduated memories.
+//
+// This invents no schedule. A correct answer on a Maintenance asset re-parks it exactly as it was,
+// and an incorrect one resets the interval and makes it due again — the booster-review behaviour
+// computeSchedule already defines. Practice writes real TrainingSession rows, but no
+// DailyReviewEntry, because nothing here was ever due.
+async function buildPracticeQueue(patientId: string): Promise<ServiceResult<MemoryAsset[]>> {
+    const db = getDatabase();
+    try {
+        const rows = await db.getAllAsync<{ asset_id: string }>(
+            `SELECT asset_id FROM MemoryAsset
+            WHERE patient_id = ? AND status = 'Maintenance'
+            ORDER BY RANDOM() LIMIT ?`,
+            [patientId, PRACTICE_SESSION_SIZE]
+        );
+
+        const assets: MemoryAsset[] = [];
+        for (const { asset_id } of rows) {
+            const result = await MemoryAssetService.getAssetById(asset_id);
+            if (result.error || !result.data) continue;
+            assets.push(result.data);
+        }
+        return { data: assets, error: null };
+    } catch {
+        return { data: null, error: 'Failed to build practice session.' };
+    }
+}
+
 // Builds a four-choice question. Distractors are same-category only; fewer than 3 means fewer choices, never mixed categories.
 async function generateQuestion(
     correctAsset: MemoryAsset,
@@ -288,6 +333,8 @@ async function submitAnswer(
 
 export const TrainingService = {
     buildSessionQueue,
+    buildPracticeQueue,
+    getDueCount,
     generateQuestion,
     submitAnswer,
     checkMastery,
