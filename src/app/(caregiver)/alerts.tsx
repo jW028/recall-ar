@@ -1,4 +1,6 @@
 import { CurrentPatientChip } from '@/components/caregiver/CurrentPatientChip';
+import { Screen } from '@/components/common/Screen';
+import { ScreenHeader } from '@/components/common/ScreenHeader';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useCurrentPatientId } from '@/store/currentPatientStore';
@@ -100,39 +102,40 @@ export default function ThreatListScreen() {
 
     if (isLoading) {
         return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={theme.primary} />
-            </View>
+            <Screen background="page">
+                <ScreenHeader title="Threats" />
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={theme.primary} />
+                </View>
+            </Screen>
         );
     }
 
     if (error) {
         return (
-            <View style={styles.loadingContainer}>
-                <Text style={styles.errorText}>{error}</Text>
-            </View>
+            <Screen background="page">
+                <ScreenHeader title="Threats" />
+                <View style={styles.loadingContainer}>
+                    <Text style={styles.errorText}>{error}</Text>
+                </View>
+            </Screen>
         );
     }
 
     return (
-        <View style={styles.container}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
-                <View>
-                    <Text style={styles.title}>⚠️ Threats</Text>
-                    <Text style={[styles.subtitle, { marginBottom: 0 }]}>
-                        {threats.filter(t => t.alertStatus !== 'Resolved').length} active alerts
-                    </Text>
-                </View>
-                {threats.length > 0 && (
-                    <Pressable onPress={clearHistory} style={{ padding: 8, backgroundColor: theme.errorBackground, borderRadius: 8, marginTop: 4 }}>
-                        <Text style={{ color: theme.error, fontWeight: '600', fontSize: 13 }}>Clear History</Text>
-                    </Pressable>
-                )}
-            </View>
-
-            <View style={{ flexDirection: 'row', marginTop: -8, marginBottom: 20 }}>
-                <CurrentPatientChip />
-            </View>
+        <Screen background="page">
+            <ScreenHeader
+                title="Threats"
+                subtitle={`${threats.filter(t => t.alertStatus !== 'Resolved').length} active alerts`}
+                right={
+                    threats.length > 0 ? (
+                        <Pressable onPress={clearHistory} style={styles.clearHistoryButton}>
+                            <Text style={styles.clearHistoryText}>Clear History</Text>
+                        </Pressable>
+                    ) : null
+                }
+                chip={<CurrentPatientChip />}
+            />
 
             {threats.length === 0 ? (
                 <View style={styles.emptyState}>
@@ -259,36 +262,30 @@ export default function ThreatListScreen() {
                     </View>
                 </View>
             </Modal>
-        </View>
+        </Screen>
     );
 }
 
 function createStyles(theme: Theme) {
     return StyleSheet.create({
-        container: {
-            flex: 1,
-            backgroundColor: theme.pageBackground,
-            paddingTop: 56,
-            paddingHorizontal: 24,
-        },
         loadingContainer: {
             flex: 1,
             justifyContent: 'center',
             alignItems: 'center',
-            backgroundColor: theme.pageBackground,
         },
-        title: {
-            fontSize: 24,
-            fontWeight: '700',
-            color: theme.heading,
-            marginBottom: 4,
+        clearHistoryButton: {
+            padding: 8,
+            backgroundColor: theme.errorBackground,
+            borderRadius: 8,
         },
-        subtitle: {
-            fontSize: 14,
-            color: theme.textMuted,
-            marginBottom: 20,
+        clearHistoryText: {
+            color: theme.error,
+            fontWeight: '600',
+            fontSize: 13,
         },
         listContent: {
+            paddingHorizontal: 24,
+            paddingTop: 20,
             paddingBottom: 32,
         },
         card: {
@@ -362,6 +359,7 @@ function createStyles(theme: Theme) {
             flex: 1,
             justifyContent: 'center',
             alignItems: 'center',
+            paddingHorizontal: 24,
         },
         emptyIcon: {
             fontSize: 48,

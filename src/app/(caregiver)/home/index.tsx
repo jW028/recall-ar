@@ -5,6 +5,7 @@ import { StatTile } from '@/components/caregiver/StatTile';
 import { Button } from '@/components/common/Button';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Screen } from '@/components/common/Screen';
+import { ScreenHeader } from '@/components/common/ScreenHeader';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { isObject, isPerson } from '@/models/MemoryAsset';
@@ -18,7 +19,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // First and last non-null smoothed values of a daily series, or null if too few
 function smoothedEndpoints(points: { smoothed: number | null }[]) {
@@ -29,7 +29,6 @@ function smoothedEndpoints(points: { smoothed: number | null }[]) {
 
 export default function CaregiverHomeScreen() {
     const theme = useTheme();
-    const insets = useSafeAreaInsets();
     const styles = useMemo(() => createStyles(theme), [theme]);
     const router = useRouter();
 
@@ -180,20 +179,19 @@ export default function CaregiverHomeScreen() {
 
     return (
         <Screen>
-            <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-                <View style={styles.headerText}>
-                    <Text style={styles.welcome}>Welcome back,</Text>
-                    <Text style={styles.name}>{user?.fullName || 'Caregiver'}</Text>
-                </View>
-                <Pressable
-                    style={styles.gear}
-                    onPress={() => router.push('/(caregiver)/home/account')}
-                    hitSlop={8}
-                    accessibilityLabel="Account settings"
-                >
-                    <Ionicons name="settings-outline" size={24} color={theme.bodySecondary} />
-                </Pressable>
-            </View>
+            <ScreenHeader
+                title={user?.fullName || 'Caregiver'}
+                subtitle="Welcome back"
+                right={
+                    <Pressable
+                        onPress={() => router.push('/(caregiver)/home/account')}
+                        hitSlop={8}
+                        accessibilityLabel="Account settings"
+                    >
+                        <Ionicons name="settings-outline" size={24} color={theme.bodySecondary} />
+                    </Pressable>
+                }
+            />
 
             <ScrollView 
                 contentContainerStyle={styles.content}
@@ -322,31 +320,6 @@ function createStyles(theme: Theme) {
             flex: 1,
             justifyContent: 'center',
             alignItems: 'center',
-        },
-        header: {
-            flexDirection: 'row',
-            alignItems: 'flex-start',
-            justifyContent: 'space-between',
-            paddingHorizontal: 20,
-            paddingBottom: 16,
-            borderBottomWidth: StyleSheet.hairlineWidth,
-            borderBottomColor: theme.border,
-        },
-        headerText: {
-            flex: 1,
-        },
-        welcome: {
-            fontSize: 16,
-            color: theme.textMuted,
-        },
-        name: {
-            fontSize: 30,
-            fontWeight: '800',
-            color: theme.heading,
-        },
-        gear: {
-            padding: 4,
-            marginTop: 4,
         },
         content: {
             padding: 20,

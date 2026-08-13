@@ -1,5 +1,7 @@
 import { AvatarPicker } from '@/components/caregiver/AvatarPicker';
 import { FormField } from '@/components/common/FormField';
+import { Screen } from '@/components/common/Screen';
+import { ScreenHeader } from '@/components/common/ScreenHeader';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { PatientService } from '@/services/PatientService';
@@ -102,19 +104,20 @@ export default function NewPatientScreen() {
     const isFormValid = Object.values(errors).every(e => e === null);
 
     return (
-        <KeyboardAvoidingView
-            style={styles.flex}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
+        <Screen>
+            <ScreenHeader
+                title="Add patient"
+                subtitle="Create a profile to start memory training and AR recognition."
+                showBack
+            />
+            <KeyboardAvoidingView
+                style={styles.flex}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            >
             <ScrollView
                 contentContainerStyle={styles.container}
                 keyboardShouldPersistTaps="handled"
             >
-                <Text style={styles.title}>Add patient</Text>
-                <Text style={styles.subtitle}>
-                    Create a profile to start memory training and AR recognition.
-                </Text>
-
                 {(createError || uploadError) && (
                     <View style={styles.errorBox}>
                         <Text style={styles.errorText}>{createError ?? uploadError}</Text>
@@ -187,16 +190,15 @@ export default function NewPatientScreen() {
                     <Text style={styles.cancelButtonText}>Cancel</Text>
                 </Pressable>
             </ScrollView>
-        </KeyboardAvoidingView>
+            </KeyboardAvoidingView>
+        </Screen>
     );
 }
 
 function createStyles(theme: Theme) {
     return StyleSheet.create({
-        flex: { flex: 1, backgroundColor: theme.surface },
-        container: { padding: 24, paddingTop: 56 },
-        title: { fontSize: 28, fontWeight: '700', color: theme.body, marginBottom: 4 },
-        subtitle: { fontSize: 15, color: theme.textMuted, marginBottom: 28 },
+        flex: { flex: 1 },
+        container: { padding: 24, paddingTop: 16 },
         errorBox: {
             backgroundColor: theme.errorBackground,
             borderColor: theme.errorBorder,

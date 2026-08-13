@@ -1,4 +1,5 @@
 import { CurrentPatientChip } from '@/components/caregiver/CurrentPatientChip';
+import { ScreenHeader } from '@/components/common/ScreenHeader';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useCurrentPatientId } from '@/store/currentPatientStore';
@@ -277,28 +278,26 @@ export default function GeofenceListScreen() {
 
     if ((isLoadingGeofences && geofences.length === 0) || (isLoadingEvents && events.length === 0 && !latestEvent)) {
         return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={theme.primary} />
+            <View style={styles.container}>
+                <ScreenHeader title="Location Tracking" />
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={theme.primary} />
+                </View>
             </View>
         );
     }
 
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
-                <View style={styles.headerRow}>
-                    <Pressable onPress={() => router.back()} style={styles.headerButton}>
-                        <Text style={styles.headerIcon}>←</Text>
-                    </Pressable>
-                    <Text style={styles.headerTitle}>Location Tracking</Text>
+            <ScreenHeader
+                title="Location Tracking"
+                right={
                     <Pressable onPress={() => setIsSettingsOpen(true)} style={styles.headerButton}>
                         <Text style={{ fontSize: 16, fontWeight: '600', color: theme.primary }}>Edit</Text>
                     </Pressable>
-                </View>
-                <View style={styles.headerChip}>
-                    <CurrentPatientChip />
-                </View>
-            </View>
+                }
+                chip={<CurrentPatientChip />}
+            />
 
             <ScrollView 
                 contentContainerStyle={styles.content}
@@ -492,36 +491,9 @@ function createStyles(theme: Theme) {
             flex: 1,
             justifyContent: 'center',
             alignItems: 'center',
-            backgroundColor: '#F8FAFC',
-        },
-        header: {
-            paddingTop: 56,
-            paddingBottom: 12,
-            paddingHorizontal: 16,
-            backgroundColor: '#FFFFFF',
-            borderBottomWidth: 1,
-            borderBottomColor: theme.border,
-        },
-        headerRow: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-        },
-        headerChip: {
-            flexDirection: 'row',
-            marginTop: 10,
-        },
-        headerTitle: {
-            fontSize: 18,
-            fontWeight: '700',
-            color: '#1E293B',
         },
         headerButton: {
             padding: 8,
-        },
-        headerIcon: {
-            fontSize: 20,
-            color: '#475569',
         },
         content: {
             padding: 20,
