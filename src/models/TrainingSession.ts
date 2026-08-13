@@ -33,3 +33,30 @@ export interface Question {
     correctAsset: MemoryAsset;
     choices: MemoryAsset[];
 }
+
+// Which retrieval direction a quiz uses. Same Question payload either way — only the rendering differs.
+export type QuizFormat = 'photoToName' | 'nameToPhoto';
+
+// One thing the patient does in a session. A teach step shows the photo together with the name and writes nothing to the database.
+export type SessionStep =
+    | { kind: 'teach'; stepId: string; asset: MemoryAsset }
+    | {
+          kind: 'quiz';
+          stepId: string;
+          asset: MemoryAsset;
+          format: QuizFormat;
+          isRetry: boolean;
+      };
+
+// One quiz attempt made during this session. Feeds the summary only; the durable record is the TrainingSession row.
+export interface SessionAttempt {
+    assetId: string;
+    correct: boolean;
+}
+
+// Positive-only session tally shown on the completion screen. Never tracks a "wrong" count.
+export interface SessionSummary {
+    answered: number;
+    correct: number;
+    masteredNames: string[]; // assets that graduated to Maintenance during this session
+}

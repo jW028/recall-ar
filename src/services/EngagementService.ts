@@ -99,8 +99,31 @@ async function getTrainingStreak(patientId: string): Promise<ServiceResult<numbe
     }
 }
 
+// Distinct memories reviewed today. Counts assets rather than attempts, matching how the session
+// summary counts, so a retry cannot make the home screen claim more memories than were worked on.
+async function getAnsweredToday(patientId: string): Promise<ServiceResult<number>> {
+    const db = getDatabase();
+    try {
+        const rows = await db.getAllAsync<{ asset_id: string; timestamp: string }>(
+            `SELECT ts.asset_id, ts.timestamp FROM TrainingSession ts
+            JOIN MemoryAsset ma ON ma.asset_id = ts.asset_id
+            WHERE ma.patient_id = ?`,
+            [patientId]
+        );
+        // Bucketed in JS because timestamps are stored UTC and the day boundary that matters is the patient's.
+        const today = localDayOf(new Date());
+        const assets = new Set(
+            rows.filter((r) => localDayOf(r.timestamp) === today).map((r) => r.asset_id)
+        );
+        return { data: assets.size, error: null };
+    } catch {
+        return { data: null, error: "Failed to count today's reviews." };
+    }
+}
+
 export const EngagementService = {
     getTrainingStreak,
+    getAnsweredToday,
     recordRecognitionEvent,
     getTodaysRecognitions,
 };

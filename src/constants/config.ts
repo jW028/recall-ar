@@ -34,11 +34,24 @@ export const MAX_DAILY_QUESTIONS = 15;
 // Answer evaluation latency
 export const ANSWER_EVALUATION_BUDGET_MS = 1000;
 
+// Fade-in for the answer choices. Its completion is what starts the response-latency measurement, so
+// keep it short and fixed — a spring or a longer fade would put a variable offset into a clinical signal.
+export const CHOICES_ENTRANCE_MS = 180;
+
 // Consecutive correct daily sessions required to flag an asset as mastered
 export const MASTERY_STREAK_THRESHOLD = 3;
 
 // Spaced Retrieval Training onboarding intervals
 export const ONBOARDING_INTERVALS_MINUTES = [1, 2, 4, 8, 16] as const;
+
+// Optional extra practice when nothing is due. Kept short: this is a "keep going if you want to",
+// not a second session, and graduated memories carry no scheduling obligation.
+export const PRACTICE_SESSION_SIZE = 5;
+
+// Local time the patient's device offers its daily review reminder. Fixed for now — a
+// caregiver-configurable time needs a preference that syncs to the patient device, which does not exist yet.
+export const REMINDER_HOUR = 10;
+export const REMINDER_MINUTE = 0;
 
 // Validation limits
 export const MAX_MEDICAL_NOTES_LENGTH = 2000;
