@@ -9,8 +9,10 @@ import { useTheme } from '@/hooks/use-theme';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { validate } from '@/utils/validation';
 import { FormField } from '@/components/common/FormField';
+import { Screen } from '@/components/common/Screen';
+import { ScreenHeader } from '@/components/common/ScreenHeader';
 import { SuggestionField } from '@/components/common/SuggestionField';
-import { useCurrentPatientId } from '@/store/currentPatientStore';
+import { useCurrentPatient, useCurrentPatientId } from '@/store/currentPatientStore';
 import { useEnrollmentViewModel } from '@/viewmodels/useMemoryAssetViewModel';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
@@ -31,6 +33,7 @@ type AssetType = 'Person' | 'Object';
 
 export default function NewAssetScreen() {
     const patientId = useCurrentPatientId() ?? undefined;
+    const currentPatient = useCurrentPatient();
     const router = useRouter();
     const theme = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
@@ -71,9 +74,11 @@ export default function NewAssetScreen() {
         existingObjectCategories.includes(category.trim().toLowerCase());
 
     const isProcessing = step === 'processing' || step === 'saving';
+    // Name the patient at the point of commitment so a wrong-patient enrollment is caught before it happens
     const submitLabel =
         step === 'processing' ? 'Processing photos…' :
         step === 'saving' ? 'Saving…' :
+        currentPatient ? `Enroll for ${currentPatient.patientName}` :
         'Enroll memory';
 
     const canPress = canSubmit && isOnline && !isProcessing && isFormValid;
@@ -148,19 +153,20 @@ export default function NewAssetScreen() {
     }
 
     return (
-        <KeyboardAvoidingView
-            style={styles.flex}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
+        <Screen>
+            <ScreenHeader
+                title="Enroll memory"
+                subtitle={`Add ${MIN_ENROLLMENT_PHOTOS}–${MAX_ENROLLMENT_PHOTOS} clear photos from different angles.`}
+                showBack
+            />
+            <KeyboardAvoidingView
+                style={styles.flex}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            >
             <ScrollView
                 contentContainerStyle={styles.container}
                 keyboardShouldPersistTaps="handled"
             >
-                <Text style={styles.title}>Enroll memory</Text>
-                <Text style={styles.subtitle}>
-                    Add {MIN_ENROLLMENT_PHOTOS}–{MAX_ENROLLMENT_PHOTOS} clear photos from different angles.
-                </Text>
-
                 {!isOnline && (
                     <View style={styles.offlineBox}>
                         <Text style={styles.offlineText}>
@@ -313,16 +319,15 @@ export default function NewAssetScreen() {
                     <Text style={styles.cancelButtonText}>Cancel</Text>
                 </Pressable>
             </ScrollView>
-        </KeyboardAvoidingView>
+            </KeyboardAvoidingView>
+        </Screen>
     );
 }
 
 function createStyles(theme: Theme) {
     return StyleSheet.create({
-        flex: { flex: 1, backgroundColor: theme.surface },
-        container: { padding: 24, paddingTop: 56 },
-        title: { fontSize: 28, fontWeight: '700', color: theme.body, marginBottom: 4 },
-        subtitle: { fontSize: 15, color: theme.textMuted, marginBottom: 20 },
+        flex: { flex: 1 },
+        container: { padding: 24, paddingTop: 16 },
         offlineBox: {
             backgroundColor: theme.errorBackground,
             borderColor: theme.errorBorder,

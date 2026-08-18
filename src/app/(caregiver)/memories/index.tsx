@@ -1,3 +1,4 @@
+import { CurrentPatientChip } from '@/components/caregiver/CurrentPatientChip';
 import { EmptyState as SharedEmptyState } from '@/components/common/EmptyState';
 import { Screen } from '@/components/common/Screen';
 import { ScreenHeader } from '@/components/common/ScreenHeader';
@@ -153,7 +154,7 @@ export default function AssetListScreen() {
     if (isLoading && filteredAssets.length === 0) {
         return (
             <Screen>
-                <ScreenHeader title="Memories" />
+                <ScreenHeader title="Memories" chip={<CurrentPatientChip />} />
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color={theme.primary} />
                 </View>
@@ -165,6 +166,7 @@ export default function AssetListScreen() {
         <Screen>
             <ScreenHeader
                 title="Memories"
+                chip={<CurrentPatientChip />}
                 right={
                     <Pressable style={styles.addButton} onPress={goToNew} hitSlop={6}>
                         <Ionicons name="add" size={20} color={theme.onPrimary} />
@@ -205,31 +207,11 @@ export default function AssetListScreen() {
 
 function createStyles(theme: Theme) {
     return StyleSheet.create({
-        container: {
-            flex: 1,
-            backgroundColor: theme.surface,
-        },
         loadingContainer: {
             flex: 1,
             justifyContent: 'center',
             alignItems: 'center',
             backgroundColor: theme.surface,
-        },
-        header: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            paddingHorizontal: 20,
-            paddingTop: 56,
-            paddingBottom: 12,
-            gap: 12,
-        },
-        backButton: {},
-        backButtonText: { fontSize: 16, color: theme.primary, fontWeight: '600' },
-        title: {
-            flex: 1,
-            fontSize: 28,
-            fontWeight: '700',
-            color: theme.body,
         },
         addButton: {
             flexDirection: 'row',

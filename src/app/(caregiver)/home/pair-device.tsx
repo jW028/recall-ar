@@ -1,9 +1,9 @@
+import { Screen } from '@/components/common/Screen';
+import { ScreenHeader } from '@/components/common/ScreenHeader';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { useCurrentPatientId } from '@/store/currentPatientStore';
+import { useCurrentPatient, useCurrentPatientId } from '@/store/currentPatientStore';
 import { useDevicePairingViewModel } from '@/viewmodels/useDevicePairingViewModel';
-import { usePatientDetailViewModel } from '@/viewmodels/usePatientViewModel';
-import { useRouter } from 'expo-router';
 import { useEffect, useMemo } from 'react';
 import { ActivityIndicator, Clipboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
@@ -16,11 +16,11 @@ function formatCountdown(seconds: number): string {
 
 export default function PairDeviceScreen() {
     const id = useCurrentPatientId() ?? undefined;
-    const router = useRouter();
     const theme = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
 
-    const { patient } = usePatientDetailViewModel(id);
+    // The cached summary already carries the name, so the header needs no extra fetch
+    const patient = useCurrentPatient();
     const {
     pairingToken,
     isGenerating,
@@ -38,11 +38,9 @@ export default function PairDeviceScreen() {
     }, [isExpired, generateToken]);
 
     return (
-    <View style={styles.container}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-        <Text style={styles.backButtonText}>‹ Back</Text>
-        </Pressable>
-
+    <Screen>
+        <ScreenHeader title="Pair device" showBack />
+        <View style={styles.container}>
         <Text style={styles.title}>Pair {patient?.patientName ?? 'patient'}'s device</Text>
         <Text style={styles.body}>
         On the patient's phone, open RecallAR and tap{' '}
@@ -103,7 +101,8 @@ export default function PairDeviceScreen() {
         This only needs to be done once per device. The patient won't need
         to scan this again unless they get a new phone.
         </Text>
-    </View>
+        </View>
+    </Screen>
     );
 }
 
@@ -111,19 +110,9 @@ function createStyles(theme: Theme) {
     return StyleSheet.create({
     container: {
     flex: 1,
-    backgroundColor: theme.surface,
     paddingHorizontal: 32,
-    paddingTop: 56,
+    paddingTop: 16,
     alignItems: 'center',
-    },
-    backButton: {
-    alignSelf: 'flex-start',
-    marginBottom: 24,
-    },
-    backButtonText: {
-    fontSize: 16,
-    color: theme.primary,
-    fontWeight: '600',
     },
     title: {
     fontSize: 24,

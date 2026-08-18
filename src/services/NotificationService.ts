@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import { REMINDER_HOUR, REMINDER_MINUTE } from '@/constants/config';
 import { supabase } from '@/database/remote/supabaseClient';
 
 // Sets how notifications behave when the app is open (foreground)
@@ -148,12 +149,70 @@ async function sendEmergencyNotification(
     }
 }
 
+// A stable identifier so rescheduling replaces the reminder instead of stacking up duplicates.
+const DAILY_REVIEW_ID = 'daily-review-reminder';
+
+// Schedules the patient's daily review nudge on this device.
+//
+// Local notification, so the stripped APNs entitlement (see plugins/withIosNoPush) does not apply —
+// unlike the emergency path above, this needs no push token and no Expo Push API round trip.
+//
+// The copy is an invitation, never loss framing: no streak warnings, no "don't break your run". The
+// patient must never be made anxious about missing a day.
+async function scheduleDailyReviewReminder(): Promise<boolean> {
+    try {
+        const { status: existing } = await Notifications.getPermissionsAsync();
+        let finalStatus = existing;
+        if (existing !== 'granted') {
+            const { status } = await Notifications.requestPermissionsAsync();
+            finalStatus = status;
+        }
+        // Declining is a valid answer; the app just stays quiet.
+        if (finalStatus !== 'granted') return false;
+
+        if (Platform.OS === 'android') {
+            await Notifications.setNotificationChannelAsync('daily-review', {
+                name: 'Daily review',
+                importance: Notifications.AndroidImportance.DEFAULT,
+                sound: 'default',
+            });
+        }
+
+        // Replacing rather than adding, so repeated app launches cannot queue several reminders.
+        await Notifications.cancelScheduledNotificationAsync(DAILY_REVIEW_ID).catch(() => {});
+        await Notifications.scheduleNotificationAsync({
+            identifier: DAILY_REVIEW_ID,
+            content: {
+                title: 'Your memories are ready',
+                body: 'A few minutes of review keeps them close.',
+                data: { url: '/(patient)/training' },
+            },
+            trigger: {
+                type: Notifications.SchedulableTriggerInputTypes.DAILY,
+                hour: REMINDER_HOUR,
+                minute: REMINDER_MINUTE,
+                channelId: 'daily-review',
+            },
+        });
+        return true;
+    } catch (e) {
+        console.warn('[NotificationService] Failed to schedule daily review reminder:', e);
+        return false;
+    }
+}
+
+async function cancelDailyReviewReminder(): Promise<void> {
+    await Notifications.cancelScheduledNotificationAsync(DAILY_REVIEW_ID).catch(() => {});
+}
+
 export const NotificationService = {
     registerForPushNotifications,
     savePushTokenForCaregiver,
     getPushTokenForCaregiver,
     sendLocalEmergencyNotification,
     sendEmergencyNotification,
+    scheduleDailyReviewReminder,
+    cancelDailyReviewReminder,
 };
 
 

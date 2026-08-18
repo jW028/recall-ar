@@ -1,9 +1,11 @@
 import { Screen } from '@/components/common/Screen';
+import { DailyGoalRing } from '@/components/patient/DailyGoalRing';
 import { PanicButton } from '@/components/patient/PanicButton';
 import { EncouragementBanner } from '@/components/patient/EncouragementBanner';
 import { StreakChip } from '@/components/patient/StreakChip';
 import { TodayMoments } from '@/components/patient/TodayMoments';
 import type { Theme } from '@/constants/theme';
+import { useCaregiverName } from '@/hooks/useCaregiverName';
 import { useTheme } from '@/hooks/use-theme';
 import { LocationService } from '@/services/LocationService';
 import { PairingService } from '@/services/PairingService';
@@ -23,8 +25,23 @@ export default function PatientHomeScreen() {
     const styles = useMemo(() => createStyles(theme), [theme]);
     const router = useRouter();
     const [isSigningOut, setIsSigningOut] = useState(false);
-    const { streakDays, recognitions, encouragement, dismissEncouragement } =
+    const { streakDays, dueCount, answeredToday, recognitions, encouragement, dismissEncouragement } =
         usePatientHomeViewModel();
+    const caregiverName = useCaregiverName();
+
+    // Keep a gentle daily nudge queued while the patient app is in use. Local-only, so the missing
+    // APNs entitlement is irrelevant; silently does nothing if notification permission is refused.
+    useEffect(() => {
+        NotificationService.scheduleDailyReviewReminder();
+    }, []);
+
+    // Never a reproach: with nothing waiting this reads as finished, not as zero.
+    const reviewBody =
+        dueCount > 0
+            ? `${dueCount} ${dueCount === 1 ? 'memory is' : 'memories are'} ready for you`
+            : answeredToday > 0
+                ? 'All caught up — lovely work today'
+                : 'Practice remembering your people and things';
 
     // ── Publish GPS location every 30 s while app is open ──────────
     useEffect(() => {
@@ -107,7 +124,10 @@ export default function PatientHomeScreen() {
                 console.warn('[PatientHome] Caregiver push token not found');
             }
 
-            Alert.alert("Emergency Broadcasted", "Your caregiver has been notified of your location.");
+            Alert.alert(
+                "Emergency Broadcasted",
+                `${caregiverName ?? 'Your caregiver'} has been notified of your location.`
+            );
         } catch (e) {
             console.error(e);
             Alert.alert("Error", "Could not send emergency alert.");
@@ -122,7 +142,11 @@ export default function PatientHomeScreen() {
                     Point the camera at a face or object to identify it, or review your memories.
                 </Text>
 
-                <EncouragementBanner encouragement={encouragement} onDismiss={dismissEncouragement} />
+                <EncouragementBanner
+                    encouragement={encouragement}
+                    caregiverName={caregiverName}
+                    onDismiss={dismissEncouragement}
+                />
 
                 <StreakChip days={streakDays} />
 
@@ -146,12 +170,15 @@ export default function PatientHomeScreen() {
                 <Pressable
                     style={({ pressed }) => [styles.actionCard, styles.secondaryCard, pressed && styles.pressed]}
                     onPress={() => router.push('/(patient)/training')}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Daily review. ${reviewBody}`}
                 >
-                    <View style={[styles.iconBadge, styles.secondaryBadge]}>
-                        <Ionicons name="school" size={32} color={theme.primary} />
+                    {/* The ring answers "is anything waiting for me?" before the patient has to tap in */}
+                    <View style={styles.reviewHeader}>
+                        <DailyGoalRing done={answeredToday} due={dueCount} />
                     </View>
                     <Text style={styles.actionTitle}>Daily review</Text>
-                    <Text style={styles.actionBody}>Practice remembering your people and things</Text>
+                    <Text style={styles.actionBody}>{reviewBody}</Text>
                 </Pressable>
             </ScrollView>
 
@@ -215,8 +242,11 @@ function createStyles(theme: Theme) {
         primaryBadge: {
             backgroundColor: 'rgba(255,255,255,0.18)',
         },
-        secondaryBadge: {
-            backgroundColor: theme.primarySoft,
+        // Occupies the same vertical space as the AR card's icon badge, so the two cards stay aligned
+        reviewHeader: {
+            height: 60,
+            justifyContent: 'center',
+            marginBottom: 8,
         },
         actionTitle: {
             fontSize: 22,

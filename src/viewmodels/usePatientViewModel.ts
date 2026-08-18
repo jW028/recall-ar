@@ -4,6 +4,7 @@ import {
     type CreatePatientParams,
     type UpdatePatientParams,
 } from '@/services/PatientService';
+import { SyncService } from '@/services/SyncService';
 import { useCallback, useEffect, useState } from 'react';
 
 interface UsePatientListViewModel {
@@ -47,12 +48,16 @@ caregiverId: string | undefined
         refresh();
     }, [refresh]);
 
-    // Pull remote patients into the local SQLite cache when the caregiverId
-    // is first set (new device / multi-device). Errors are silently ignored
-    // so the app continues to work fully offline.
+    // Hydrate this device when the caregiverId is first set (new device / multi-device),
+    // rather than waiting for the next background sync cycle. Goes through SyncService so
+    // pulled rows get the pending-write guard and last-write-wins check, and so the
+    // patients' memory assets arrive with them. Errors are silently ignored so the app
+    // continues to work fully offline.
     useEffect(() => {
         if (!caregiverId) return;
-        PatientService.pullPatientsFromCloud(caregiverId).then(() => refresh());
+        SyncService.pullAllForCaregiver(caregiverId)
+            .then(() => refresh())
+            .catch(() => {});
     }, [caregiverId, refresh]);
 
     const createPatient = useCallback(

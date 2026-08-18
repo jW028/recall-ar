@@ -1,10 +1,12 @@
 import { AnalyticsEmptyState } from '@/components/analytics/AnalyticsEmptyState';
+import { CurrentPatientChip } from '@/components/caregiver/CurrentPatientChip';
 import { DegradationBanner } from '@/components/analytics/DegradationBanner';
 import { EncouragementPanel } from '@/components/analytics/EncouragementPanel';
 import { EngagementCard } from '@/components/analytics/EngagementCard';
 import { SummaryCard } from '@/components/analytics/SummaryCard';
 import { TimeframeSelector } from '@/components/analytics/TimeframeSelector';
 import { TrendChart } from '@/components/analytics/TrendChart';
+import { Button } from '@/components/common/Button';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Screen } from '@/components/common/Screen';
 import { ScreenHeader } from '@/components/common/ScreenHeader';
@@ -15,7 +17,7 @@ import type { MemoryAsset } from '@/models/MemoryAsset';
 import { useCurrentPatientId } from '@/store/currentPatientStore';
 import { useAnalyticsViewModel } from '@/viewmodels/useAnalyticsViewModel';
 import { useMemoryAssetListViewModel } from '@/viewmodels/useMemoryAssetViewModel';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -48,7 +50,7 @@ export default function TrainingScreen() {
 
     return (
         <Screen>
-            <ScreenHeader title="Training" />
+            <ScreenHeader title="Training" chip={<CurrentPatientChip />} />
             <View style={styles.segmentBar}>
                 <View style={styles.segmentRow}>
                     {(['overview', 'analytics'] as const).map((value) => {
@@ -87,6 +89,7 @@ function OverviewTab({
     styles: ReturnType<typeof createStyles>;
     theme: Theme;
 }) {
+    const router = useRouter();
     const { assets, isLoading, error, activeCount, pause, resume, pendingId, refresh } =
         useMemoryAssetListViewModel(patientId);
 
@@ -116,7 +119,18 @@ function OverviewTab({
             )}
 
             {assets.length === 0 ? (
-                <Text style={styles.emptyBody}>No memories enrolled yet.</Text>
+                <EmptyState
+                    icon="images-outline"
+                    title="No memories enrolled yet"
+                    body="Training draws on the people and objects you enroll. Add the first one to give this patient something to review."
+                    action={
+                        <Button
+                            label="Enroll a memory"
+                            icon="add"
+                            onPress={() => router.push('/(caregiver)/memories/new')}
+                        />
+                    }
+                />
             ) : (
                 assets.map((asset) => (
                     <AssetRow

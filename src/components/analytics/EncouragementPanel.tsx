@@ -18,6 +18,9 @@ export function EncouragementPanel({ patientId }: { patientId: string }) {
         useEncouragementViewModel(patientId);
 
     const disabled = isSending || isCoolingDown;
+    const daysSince = daysSinceLastReview(snapshot?.lastActiveDay ?? null);
+    // Two days is a gap worth a nudge; one is just a day off.
+    const needsNudge = daysSince !== null && daysSince >= 2;
 
     return (
         <View style={styles.card}>
@@ -34,7 +37,20 @@ export function EncouragementPanel({ patientId }: { patientId: string }) {
                         <Text style={styles.statLabel}>Answered today</Text>
                         <Text style={styles.statValue}>{snapshot.answeredToday}</Text>
                     </View>
+                    <View style={styles.stat}>
+                        <Text style={styles.statLabel}>Last reviewed</Text>
+                        <Text style={[styles.statValue, needsNudge && styles.statValueAttention]}>
+                            {lastReviewedLabel(snapshot.lastActiveDay)}
+                        </Text>
+                    </View>
                 </View>
+            )}
+            {/* The at-risk signal lives here and nowhere else: the patient's own screens stay purely
+                encouraging, and this panel is exactly where a caregiver can act on it. */}
+            {needsNudge && (
+                <Text style={styles.nudge}>
+                    It has been a few days — a message from you often helps.
+                </Text>
             )}
             <View style={styles.presetRow}>
                 {PRESETS.map((preset) => (
@@ -53,6 +69,23 @@ export function EncouragementPanel({ patientId }: { patientId: string }) {
             {error && <Text style={styles.error}>{error}</Text>}
         </View>
     );
+}
+
+// Whole days between the patient's last recorded review and today. Null when they have never trained.
+function daysSinceLastReview(lastActiveDay: string | null): number | null {
+    if (!lastActiveDay) return null;
+    const last = Date.parse(`${lastActiveDay}T00:00:00Z`);
+    if (Number.isNaN(last)) return null;
+    const today = Date.parse(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`);
+    return Math.max(0, Math.round((today - last) / 86_400_000));
+}
+
+function lastReviewedLabel(lastActiveDay: string | null): string {
+    const days = daysSinceLastReview(lastActiveDay);
+    if (days === null) return 'Not yet';
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Yesterday';
+    return `${days} days ago`;
 }
 
 function createStyles(theme: Theme) {
@@ -86,6 +119,15 @@ function createStyles(theme: Theme) {
             fontSize: 18,
             fontWeight: '700',
             color: theme.body,
+        },
+        // Attention, not alarm — a gap in adherence is not a clinical finding
+        statValueAttention: {
+            color: theme.warning,
+        },
+        nudge: {
+            fontSize: 13,
+            color: theme.bodySecondary,
+            lineHeight: 18,
         },
         presetRow: {
             flexDirection: 'row',

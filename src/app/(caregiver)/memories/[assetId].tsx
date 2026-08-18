@@ -1,4 +1,6 @@
 import { Button } from '@/components/common/Button';
+import { Screen } from '@/components/common/Screen';
+import { ScreenHeader } from '@/components/common/ScreenHeader';
 import { SuggestionChips } from '@/components/common/SuggestionChips';
 import {
     MAX_ENROLLMENT_PHOTOS,
@@ -230,17 +232,23 @@ export default function AssetDetailScreen() {
 
     if (isLoading && !asset) {
         return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={theme.primary} />
-            </View>
+            <Screen>
+                <ScreenHeader title="Memory" showBack />
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={theme.primary} />
+                </View>
+            </Screen>
         );
     }
 
     if (error || !asset) {
         return (
-            <View style={styles.loadingContainer}>
-                <Text style={styles.errorText}>{error ?? 'Memory not found.'}</Text>
-            </View>
+            <Screen>
+                <ScreenHeader title="Memory" showBack />
+                <View style={styles.loadingContainer}>
+                    <Text style={styles.errorText}>{error ?? 'Memory not found.'}</Text>
+                </View>
+            </Screen>
         );
     }
 
@@ -248,20 +256,19 @@ export default function AssetDetailScreen() {
     const obj = !isPerson(asset) ? asset : null;
 
     return (
-        <ScrollView contentContainerStyle={styles.container}>
-            <Pressable style={styles.backButton} onPress={() => router.back()}>
-                <Text style={styles.backButtonText}>‹ Back</Text>
-            </Pressable>
-
-            <View style={styles.header}>
-                <Text style={styles.title}>{asset.name}</Text>
-                {!isEditing && (
-                    <Pressable onPress={() => setIsEditing(true)}>
-                        <Text style={styles.editLink}>Edit</Text>
-                    </Pressable>
-                )}
-            </View>
-
+        <Screen>
+            <ScreenHeader
+                title={asset.name}
+                showBack
+                right={
+                    !isEditing ? (
+                        <Pressable onPress={() => setIsEditing(true)} hitSlop={6}>
+                            <Text style={styles.editLink}>Edit</Text>
+                        </Pressable>
+                    ) : null
+                }
+            />
+            <ScrollView contentContainerStyle={styles.container}>
             <Image source={{ uri: asset.imageUrl }} style={styles.heroImage} />
 
             {updateError && (
@@ -495,7 +502,8 @@ export default function AssetDetailScreen() {
                     </Text>
                 </Pressable>
             )}
-        </ScrollView>
+            </ScrollView>
+        </Screen>
     );
 }
 
@@ -520,29 +528,13 @@ function createStyles(theme: Theme) {
     return StyleSheet.create({
         container: {
             padding: 24,
-            paddingTop: 56,
-            backgroundColor: theme.surface,
+            paddingTop: 16,
             flexGrow: 1,
         },
         loadingContainer: {
             flex: 1,
             justifyContent: 'center',
             alignItems: 'center',
-            backgroundColor: theme.surface,
-        },
-        backButton: { alignSelf: 'flex-start', marginBottom: 16 },
-        backButtonText: { fontSize: 16, color: theme.primary, fontWeight: '600' },
-        header: {
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 16,
-        },
-        title: {
-            fontSize: 26,
-            fontWeight: '700',
-            color: theme.body,
-            flex: 1,
         },
         editLink: {
             fontSize: 15,

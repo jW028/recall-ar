@@ -3,6 +3,7 @@ import { Screen } from '@/components/common/Screen';
 import { AlbumCard } from '@/components/patient/AlbumCard';
 import { AlbumDetailModal } from '@/components/patient/AlbumDetailModal';
 import type { Theme } from '@/constants/theme';
+import { useCaregiverName } from '@/hooks/useCaregiverName';
 import { useTheme } from '@/hooks/use-theme';
 import type { MemoryAsset } from '@/models/MemoryAsset';
 import { useAlbumViewModel } from '@/viewmodels/useAlbumViewModel';
@@ -13,6 +14,7 @@ export default function AlbumScreen() {
     const theme = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
     const { status, error, mastered, learning } = useAlbumViewModel();
+    const caregiverName = useCaregiverName();
     const [selected, setSelected] = useState<MemoryAsset | null>(null);
 
     const sections = useMemo(
@@ -50,7 +52,7 @@ export default function AlbumScreen() {
                 <EmptyState
                     icon="images-outline"
                     title="Your album is waiting"
-                    body="Memories your caregiver adds will appear here."
+                    body={`Memories ${caregiverName ?? 'your caregiver'} adds will appear here.`}
                 />
             </Screen>
         );

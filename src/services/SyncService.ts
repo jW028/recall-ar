@@ -25,7 +25,33 @@ export interface PullSummary {
 // Tables pulled from Supabase into local SQLite, in FK-safe order (a parent before anything that references it). Push-only tables are absent.
 const PULL_ORDER: SyncableTable[] = ['Patient', 'MemoryAsset', 'Encouragement'];
 
+// The patient-scoped subset of PULL_ORDER. A caregiver device pulls Patient by caregiver_id first, then walks these per patient.
+const PATIENT_SCOPED_PULL_ORDER: SyncableTable[] = ['MemoryAsset', 'Encouragement'];
+
 const EPOCH = '1970-01-01T00:00:00.000Z';
+
+// Identifies the rows one pull is allowed to see. Patient is scoped by caregiver_id on a caregiver device and by patient_id on a patient device; every child table is scoped by patient_id.
+interface PullScope {
+    column: string;
+    value: string;
+}
+
+// Three different timestamp shapes reach the watermark comparison: local writes use ISO-8601 ("...Z"), Postgres returns an offset form ("...+00:00"), and SQLite column defaults use datetime('now') ("YYYY-MM-DD HH:MM:SS"). Comparing those lexically is wrong, so everything is normalised to ISO-8601 UTC first.
+function toIsoUtc(value: unknown): string {
+    if (value == null) return EPOCH;
+
+    const raw = String(value).trim();
+    if (!raw) return EPOCH;
+
+    // datetime('now') separates date and time with a space rather than the ISO 'T'.
+    let candidate = raw.includes('T') ? raw : raw.replace(' ', 'T');
+
+    // Without an explicit zone, Date.parse reads a date-time as device-local. Every timestamp stored by this app is UTC, so say so.
+    if (!/(?:Z|[+-]\d{2}:?\d{2})$/.test(candidate)) candidate += 'Z';
+
+    const parsed = Date.parse(candidate);
+    return Number.isNaN(parsed) ? EPOCH : new Date(parsed).toISOString();
+}
 
 // Helpers
 
@@ -94,21 +120,26 @@ async function pushRow(row: SyncLogRow): Promise<string | null> {
 
 // Pull helpers
 
-async function getWatermark(table: SyncableTable): Promise<string> {
+// Watermarks are per (table, scope) — a caregiver with two patients must not let one patient's pull advance the other's high-water mark past its unseen rows.
+async function getWatermark(table: SyncableTable, scopeKey: string): Promise<string> {
     const db = getDatabase();
     const row = await db.getFirstAsync<{ last_pulled_at: string }>(
-    `SELECT last_pulled_at FROM SyncState WHERE table_name = ?`,
-    [table]
+    `SELECT last_pulled_at FROM SyncState WHERE table_name = ? AND scope_key = ?`,
+    [table, scopeKey]
     );
     return row?.last_pulled_at ?? EPOCH;
 }
 
-async function setWatermark(table: SyncableTable, value: string): Promise<void> {
+async function setWatermark(
+    table: SyncableTable,
+    scopeKey: string,
+    value: string
+): Promise<void> {
     const db = getDatabase();
     await db.runAsync(
-    `INSERT INTO SyncState (table_name, last_pulled_at) VALUES (?, ?)
-        ON CONFLICT(table_name) DO UPDATE SET last_pulled_at = excluded.last_pulled_at`,
-    [table, value]
+    `INSERT INTO SyncState (table_name, scope_key, last_pulled_at) VALUES (?, ?, ?)
+        ON CONFLICT(table_name, scope_key) DO UPDATE SET last_pulled_at = excluded.last_pulled_at`,
+    [table, scopeKey, value]
     );
 }
 
@@ -149,36 +180,32 @@ async function shouldWrite(
     );
     if (pending) return false;
 
-    // Last-write-wins: skip if the local copy is the same age or newer.
+    // Last-write-wins: skip if the local copy is the same age or newer. Both sides are normalised first — the local copy and the remote row store the same instant in different formats.
     const local = await config.readLocalRow(rowId);
     if (local && config.pull) {
     const col = config.pull.watermarkColumn;
-    if (String(local[col]) >= String(remote[col])) return false;
+    if (toIsoUtc(local[col]) >= toIsoUtc(remote[col])) return false;
     }
     return true;
 }
 
-// Pulls one table's changes since its watermark.
+// Pulls one table's changes since its watermark, restricted to the given scope.
 async function pullTable(
     table: SyncableTable,
-    patientId?: string
+    scope: PullScope
 ): Promise<PullSummary> {
     const config = syncTableConfig[table];
     if (!config.pull) return { pulled: 0, skipped: 0 };
 
-    const since = await getWatermark(table);
+    const since = await getWatermark(table, scope.value);
 
-    let query = supabase
+    const { data, error } = await supabase
     .from(config.supabaseTable)
     .select('*')
+    .eq(scope.column, scope.value)
     .gt(config.pull.watermarkColumn, since)
     .order(config.pull.watermarkColumn, { ascending: true });
 
-    if (config.pull.scopeColumn && patientId) {
-    query = query.eq(config.pull.scopeColumn, patientId);
-    }
-
-    const { data, error } = await query;
     if (error || !data) return { pulled: 0, skipped: 0 };
 
     let pulled = 0;
@@ -193,11 +220,11 @@ async function pullTable(
         skipped++;
     }
     // Advance past every row we've seen, written or not, so it isn't refetched.
-    const w = String(remote[config.pull.watermarkColumn]);
+    const w = toIsoUtc(remote[config.pull.watermarkColumn]);
     if (w > maxWatermark) maxWatermark = w;
     }
 
-    if (maxWatermark !== since) await setWatermark(table, maxWatermark);
+    if (maxWatermark !== since) await setWatermark(table, scope.value, maxWatermark);
     return { pulled, skipped };
 }
 
@@ -228,7 +255,7 @@ async function drainQueue(): Promise<SyncSummary> {
     return { attempted: pendingRows.length, succeeded, failed };
 }
 
-// Pulls all pullable tables (Patient, then MemoryAsset) for one patient into local SQLite. Safe to call alongside drainQueue; run push first, then pull.
+// Pulls all pullable tables for one patient into local SQLite. This is the patient-device entry point. Safe to call alongside drainQueue; run push first, then pull.
 async function pullAll(patientId: string): Promise<PullSummary> {
     if (!isDatabaseReady()) {
     return { pulled: 0, skipped: 0 };
@@ -237,10 +264,45 @@ async function pullAll(patientId: string): Promise<PullSummary> {
     let pulled = 0;
     let skipped = 0;
     for (const table of PULL_ORDER) {
-    const summary = await pullTable(table, patientId);
+    const scopeColumn = syncTableConfig[table].pull?.scopeColumn;
+    if (!scopeColumn) continue;
+    const summary = await pullTable(table, { column: scopeColumn, value: patientId });
     pulled += summary.pulled;
     skipped += summary.skipped;
     }
+    return { pulled, skipped };
+}
+
+// Pulls everything a caregiver device needs. Patient is fetched by caregiver_id because on a fresh device there is no local Patient row to derive a patient_id from; only once those land can the per-patient children be scoped. Without this, a caregiver device pushed its queue up and never pulled anything back down.
+async function pullAllForCaregiver(caregiverId: string): Promise<PullSummary> {
+    if (!isDatabaseReady()) {
+    return { pulled: 0, skipped: 0 };
+    }
+
+    const patientSummary = await pullTable('Patient', {
+    column: 'caregiver_id',
+    value: caregiverId,
+    });
+
+    let pulled = patientSummary.pulled;
+    let skipped = patientSummary.skipped;
+
+    const db = getDatabase();
+    const patients = await db.getAllAsync<{ patient_id: string }>(
+    `SELECT patient_id FROM Patient WHERE caregiver_id = ?`,
+    [caregiverId]
+    );
+
+    for (const { patient_id } of patients) {
+    for (const table of PATIENT_SCOPED_PULL_ORDER) {
+        const scopeColumn = syncTableConfig[table].pull?.scopeColumn;
+        if (!scopeColumn) continue;
+        const summary = await pullTable(table, { column: scopeColumn, value: patient_id });
+        pulled += summary.pulled;
+        skipped += summary.skipped;
+    }
+    }
+
     return { pulled, skipped };
 }
 
@@ -260,5 +322,6 @@ async function hasPendingChanges(): Promise<boolean> {
 export const SyncService = {
     drainQueue,
     pullAll,
+    pullAllForCaregiver,
     hasPendingChanges,
 };

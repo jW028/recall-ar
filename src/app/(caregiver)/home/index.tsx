@@ -5,6 +5,7 @@ import { StatTile } from '@/components/caregiver/StatTile';
 import { Button } from '@/components/common/Button';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Screen } from '@/components/common/Screen';
+import { ScreenHeader } from '@/components/common/ScreenHeader';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { isObject, isPerson } from '@/models/MemoryAsset';
@@ -18,7 +19,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // First and last non-null smoothed values of a daily series, or null if too few
 function smoothedEndpoints(points: { smoothed: number | null }[]) {
@@ -29,29 +29,49 @@ function smoothedEndpoints(points: { smoothed: number | null }[]) {
 
 export default function CaregiverHomeScreen() {
     const theme = useTheme();
-    const insets = useSafeAreaInsets();
     const styles = useMemo(() => createStyles(theme), [theme]);
     const router = useRouter();
 
     const user = useAuthStore((s) => s.user);
     const currentPatientId = useCurrentPatientId();
     const setCurrentPatient = useCurrentPatientStore((s) => s.setCurrentPatient);
+    const syncFromList = useCurrentPatientStore((s) => s.syncFromList);
 
     const { patients, isLoading, refresh: refreshPatients } = usePatientListViewModel(user?.id);
 
-    // Auto-select a valid current patient whenever the list changes
+    // Auto-select a valid current patient whenever the list changes, refreshing the cached name and photo
     useEffect(() => {
         if (patients.length === 0) return;
         const stillValid = currentPatientId && patients.some((p) => p.patientId === currentPatientId);
-        if (!stillValid) setCurrentPatient(patients[0].patientId);
-    }, [patients, currentPatientId, setCurrentPatient]);
+        if (stillValid) {
+            syncFromList(patients);
+            return;
+        }
+        const fallback = patients[0];
+        setCurrentPatient(fallback.patientId, {
+            patientName: fallback.patientName,
+            imageUrl: fallback.imageUrl,
+        });
+    }, [patients, currentPatientId, setCurrentPatient, syncFromList]);
+
+    // Carry the name and photo into the store so every other screen's header can label itself
+    const selectPatient = useCallback(
+        (patientId: string) => {
+            const next = patients.find((p) => p.patientId === patientId);
+            setCurrentPatient(
+                patientId,
+                next ? { patientName: next.patientName, imageUrl: next.imageUrl } : undefined
+            );
+        },
+        [patients, setCurrentPatient]
+    );
 
     const currentPatient = useMemo(
         () => patients.find((p) => p.patientId === currentPatientId) ?? null,
         [patients, currentPatientId]
     );
 
-    const { assets, refresh } = useMemoryAssetListViewModel(currentPatient?.patientId);
+    const { assets, refresh, isLoading: isLoadingAssets } = useMemoryAssetListViewModel(currentPatient?.patientId);
     const { dataset, exportReport, isExporting, exportMessage, exportError, clearExportMessage } =
         useAnalyticsViewModel(currentPatient?.patientId);
 
@@ -159,20 +179,19 @@ export default function CaregiverHomeScreen() {
 
     return (
         <Screen>
-            <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-                <View style={styles.headerText}>
-                    <Text style={styles.welcome}>Welcome back,</Text>
-                    <Text style={styles.name}>{user?.fullName || 'Caregiver'}</Text>
-                </View>
-                <Pressable
-                    style={styles.gear}
-                    onPress={() => router.push('/(caregiver)/home/account')}
-                    hitSlop={8}
-                    accessibilityLabel="Account settings"
-                >
-                    <Ionicons name="settings-outline" size={24} color={theme.bodySecondary} />
-                </Pressable>
-            </View>
+            <ScreenHeader
+                title={user?.fullName || 'Caregiver'}
+                subtitle="Welcome back"
+                right={
+                    <Pressable
+                        onPress={() => router.push('/(caregiver)/home/account')}
+                        hitSlop={8}
+                        accessibilityLabel="Account settings"
+                    >
+                        <Ionicons name="settings-outline" size={24} color={theme.bodySecondary} />
+                    </Pressable>
+                }
+            />
 
             <ScrollView 
                 contentContainerStyle={styles.content}
@@ -183,9 +202,9 @@ export default function CaregiverHomeScreen() {
                 <CurrentPatientCard
                     patients={patients}
                     currentPatientId={currentPatientId}
-                    onSelect={setCurrentPatient}
+                    onSelect={selectPatient}
                     onViewEdit={() => router.push('/(caregiver)/home/patient')}
-                    onChange={() => router.push('/(caregiver)/home/select-patient')}
+                    onAddPatient={() => router.push('/(caregiver)/home/new-patient')}
                 />
 
                 <View style={[styles.threatCard, activeThreatsCount > 0 && styles.threatCardActive]}>
@@ -201,6 +220,23 @@ export default function CaregiverHomeScreen() {
                         </Pressable>
                     )}
                 </View>
+
+                {/* The tiles below all read zero until something is enrolled, so name the next step outright */}
+                {!isLoadingAssets && assets.length === 0 && (
+                    <View style={styles.setupCallout}>
+                        <Text style={styles.setupTitle}>Enroll the first memory</Text>
+                        <Text style={styles.setupBody}>
+                            {currentPatient?.patientName ?? 'This patient'} has nothing to train on yet. Add a
+                            person or object, then pair their device so they can start reviewing.
+                        </Text>
+                        <Button
+                            label="Enroll a memory"
+                            icon="add"
+                            onPress={() => router.push('/(caregiver)/memories/new')}
+                            style={styles.setupButton}
+                        />
+                    </View>
+                )}
 
                 <View style={styles.row}>
                     <StatTile
@@ -249,17 +285,13 @@ export default function CaregiverHomeScreen() {
                 />
 
 
-                <Text style={styles.sectionTitle}>Quick Actions</Text>
+                {/* Only destinations with no tab or header entry of their own belong here */}
+                <Text style={styles.sectionTitle}>Setup & Reports</Text>
                 <View style={styles.actions}>
                     <ActionRow
-                        icon="add-circle-outline"
-                        label="Enroll Memory"
-                        onPress={() => router.push('/(caregiver)/memories/new')}
-                    />
-                    <ActionRow
-                        icon="people-outline"
-                        label="Switch Patient"
-                        onPress={() => router.push('/(caregiver)/home/select-patient')}
+                        icon="shield-checkmark-outline"
+                        label="Add Safe Zone"
+                        onPress={() => router.push('/(caregiver)/location/create')}
                     />
                     <ActionRow
                         icon="phone-portrait-outline"
@@ -270,6 +302,11 @@ export default function CaregiverHomeScreen() {
                         icon="document-text-outline"
                         label="Export Medical Report"
                         onPress={handleExport}
+                    />
+                    <ActionRow
+                        icon="help-circle-outline"
+                        label="User Guide & FAQ"
+                        onPress={() => router.push('/(caregiver)/home/user-guide')}
                     />
                 </View>
             </ScrollView>
@@ -284,31 +321,6 @@ function createStyles(theme: Theme) {
             justifyContent: 'center',
             alignItems: 'center',
         },
-        header: {
-            flexDirection: 'row',
-            alignItems: 'flex-start',
-            justifyContent: 'space-between',
-            paddingHorizontal: 20,
-            paddingBottom: 16,
-            borderBottomWidth: StyleSheet.hairlineWidth,
-            borderBottomColor: theme.border,
-        },
-        headerText: {
-            flex: 1,
-        },
-        welcome: {
-            fontSize: 16,
-            color: theme.textMuted,
-        },
-        name: {
-            fontSize: 30,
-            fontWeight: '800',
-            color: theme.heading,
-        },
-        gear: {
-            padding: 4,
-            marginTop: 4,
-        },
         content: {
             padding: 20,
             gap: 16,
@@ -322,6 +334,27 @@ function createStyles(theme: Theme) {
             fontWeight: '800',
             color: theme.heading,
             marginTop: 8,
+        },
+        setupCallout: {
+            backgroundColor: theme.primaryMuted,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: theme.primarySoft,
+            padding: 18,
+        },
+        setupTitle: {
+            fontSize: 17,
+            fontWeight: '700',
+            color: theme.heading,
+            marginBottom: 6,
+        },
+        setupBody: {
+            fontSize: 14,
+            lineHeight: 20,
+            color: theme.bodySecondary,
+        },
+        setupButton: {
+            marginTop: 14,
         },
         actions: {
             gap: 12,

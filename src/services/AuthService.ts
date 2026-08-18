@@ -206,6 +206,21 @@ async function getCurrentUser(): Promise<AuthUser | null> {
     return resolveAuthUser(data.user);
 }
 
+// Id and role of the signed-in user, read straight from the persisted session.
+// Unlike getCurrentUser this never touches the network — the background sync cycle runs every 30s
+// and does not need the Caregiver profile lookup that resolveAuthUser performs.
+async function getSessionIdentity(): Promise<{ id: string; role: UserRole } | null> {
+    const { data } = await supabase.auth.getSession();
+    const user = data.session?.user;
+    if (!user) return null;
+
+    const role = (user.user_metadata?.role as UserRole) ?? 'caregiver';
+    // Mirrors resolveAuthUser: for a patient the meaningful id is patient_id, not the auth user id.
+    const id = role === 'patient' ? (user.user_metadata?.patient_id ?? user.id) : user.id;
+
+    return { id, role };
+}
+
 // Subscribe to auth state changes (sign in, sign out, token refresh)
 function onAuthStateChange(
     callback: (user: AuthUser | null) => void
@@ -231,5 +246,6 @@ export const AuthService = {
     signOut, 
     getSession,
     getCurrentUser,
+    getSessionIdentity,
     onAuthStateChange,
 };

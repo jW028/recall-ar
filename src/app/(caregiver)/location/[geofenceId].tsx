@@ -1,3 +1,5 @@
+import { Screen } from '@/components/common/Screen';
+import { ScreenHeader } from '@/components/common/ScreenHeader';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useGeofenceConfigViewModel } from '@/viewmodels/useGeofenceViewModels';
@@ -227,16 +229,22 @@ export default function GeofenceConfigScreen() {
     // ── Loading / error states ────────────────────────────────────
     if (isLoading) {
         return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={theme.primary} />
-            </View>
+            <Screen background="page">
+                <ScreenHeader title="Safe Zone" showBack />
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={theme.primary} />
+                </View>
+            </Screen>
         );
     }
     if (error) {
         return (
-            <View style={styles.loadingContainer}>
-                <Text style={styles.errorText}>{error}</Text>
-            </View>
+            <Screen background="page">
+                <ScreenHeader title="Safe Zone" showBack />
+                <View style={styles.loadingContainer}>
+                    <Text style={styles.errorText}>{error}</Text>
+                </View>
+            </Screen>
         );
     }
 
@@ -246,24 +254,23 @@ export default function GeofenceConfigScreen() {
         : { latitude: 3.139, longitude: 101.6869, latitudeDelta: 0.05, longitudeDelta: 0.07 };
 
     return (
-        <View style={styles.root}>
-            {/* ── Top header bar ──────────────────────────────── */}
-            <View style={styles.header}>
-                <Pressable style={styles.headerBack} onPress={() => router.back()}>
-                    <Text style={styles.headerBackText}>← Back</Text>
-                </Pressable>
-                <Text style={styles.headerTitle}>Configure Safe Zone</Text>
-                <Pressable
-                    style={[styles.saveBtn, isUpdating && styles.saveBtnDisabled]}
-                    onPress={handleSave}
-                    disabled={isUpdating}
-                >
-                    {isUpdating
-                        ? <ActivityIndicator size="small" color={theme.onPrimary} />
-                        : <Text style={styles.saveBtnText}>Save</Text>
-                    }
-                </Pressable>
-            </View>
+        <Screen background="page">
+            <ScreenHeader
+                title="Safe Zone"
+                showBack
+                right={
+                    <Pressable
+                        style={[styles.saveBtn, isUpdating && styles.saveBtnDisabled]}
+                        onPress={handleSave}
+                        disabled={isUpdating}
+                    >
+                        {isUpdating
+                            ? <ActivityIndicator size="small" color={theme.onPrimary} />
+                            : <Text style={styles.saveBtnText}>Save</Text>
+                        }
+                    </Pressable>
+                }
+            />
 
             <ScrollView
                 contentContainerStyle={styles.scroll}
@@ -531,52 +538,17 @@ export default function GeofenceConfigScreen() {
 
                 <View style={{ height: 40 }} />
             </ScrollView>
-        </View>
+        </Screen>
     );
 }
 
 // ─────────────────────────────────────────────────────────────────
 function createStyles(theme: Theme) {
     return StyleSheet.create({
-        root: {
-            flex: 1,
-            backgroundColor: theme.pageBackground,
-        },
         loadingContainer: {
             flex: 1,
             justifyContent: 'center',
             alignItems: 'center',
-            backgroundColor: theme.pageBackground,
-        },
-
-        // ── Header ──────────────────────────────────────────────
-        header: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingTop: 56,
-            paddingBottom: 12,
-            paddingHorizontal: 16,
-            backgroundColor: theme.surface,
-            borderBottomWidth: 1,
-            borderBottomColor: theme.border,
-        },
-        headerBack: {
-            paddingVertical: 6,
-            paddingRight: 12,
-            minWidth: 64,
-        },
-        headerBackText: {
-            fontSize: 15,
-            color: theme.primary,
-            fontWeight: '500',
-        },
-        headerTitle: {
-            fontSize: 16,
-            fontWeight: '700',
-            color: theme.heading,
-            flex: 1,
-            textAlign: 'center',
         },
         saveBtn: {
             backgroundColor: theme.primary,

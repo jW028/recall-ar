@@ -5,6 +5,8 @@ import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+export const TAB_ICON_SIZE = 26;
+
 // Custom themed bottom tab bar shared by patient and caregiver navigators
 export function AppTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
     const theme = useTheme();
@@ -45,7 +47,7 @@ export function AppTabBar({ state, descriptors, navigation }: BottomTabBarProps)
                         onPress={onPress}
                         style={styles.tab}
                     >
-                        {options.tabBarIcon?.({ focused: isFocused, color, size: 26 })}
+                        {options.tabBarIcon?.({ focused: isFocused, color, size: TAB_ICON_SIZE })}
                         <Text style={[styles.label, { color }]} numberOfLines={1}>
                             {label}
                         </Text>
