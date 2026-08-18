@@ -5,7 +5,10 @@ import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useCurrentPatientId } from '@/store/currentPatientStore';
 import { usePatientLocationViewModel } from '@/viewmodels/useGeofenceViewModels';
+import { usePatientDetailViewModel } from '@/viewmodels/usePatientViewModel';
 import { useThreatListViewModel } from '@/viewmodels/useThreatViewModel';
+import { Ionicons } from '@expo/vector-icons';
+import * as Linking from 'expo-linking';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
@@ -95,10 +98,22 @@ export default function ThreatListScreen() {
     const styles = useMemo(() => createStyles(theme), [theme]);
     const router = useRouter();
 
+    const { patient } = usePatientDetailViewModel(patientId);
+
     const { threats, isLoading, error, refresh, acknowledgeThreat, resolveThreat, clearHistory } =
         useThreatListViewModel(patientId);
 
     const [showLocationTab, setShowLocationTab] = useState(false);
+
+    const handleMakeCall = async () => {
+        const contactNumber = patient?.emergencyContact?.trim();
+        const url = contactNumber ? `tel:${contactNumber}` : 'tel:';
+        try {
+            await Linking.openURL(url);
+        } catch (e) {
+            Alert.alert('Error', 'Unable to open phone call app on this device.');
+        }
+    };
 
     if (isLoading) {
         return (
@@ -209,6 +224,25 @@ export default function ThreatListScreen() {
                                                 }}
                                             >
                                                 <Text style={styles.ackButtonText}>Resolve</Text>
+                                            </Pressable>
+
+                                            <Pressable
+                                                style={[
+                                                    styles.ackButton,
+                                                    {
+                                                        flex: 1,
+                                                        backgroundColor: '#0284C7',
+                                                        marginTop: 0,
+                                                        flexDirection: 'row',
+                                                        justifyContent: 'center',
+                                                        alignItems: 'center',
+                                                        gap: 6,
+                                                    },
+                                                ]}
+                                                onPress={handleMakeCall}
+                                            >
+                                                <Ionicons name="call" size={16} color="#FFFFFF" />
+                                                <Text style={styles.ackButtonText}>Call</Text>
                                             </Pressable>
                                         </View>
 
