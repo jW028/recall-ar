@@ -22,7 +22,7 @@ export function useFallDetectionViewModel(): UseFallDetectionViewModel {
     const [isMonitoring, setIsMonitoring] = useState(false);
     const [fallState, setFallState] = useState<FallState>('idle');
     const [countdownSeconds, setCountdownSeconds] = useState(INITIAL_COUNTDOWN_SECONDS);
-    const [sensitivity, setSensitivity] = useState<SensitivityLevel>('normal');
+    const [sensitivity, setSensitivity] = useState<SensitivityLevel>('high');
     
     const patientIdRef = useRef<string | null>(null);
     const caregiverIdRef = useRef<string | null>(null);
