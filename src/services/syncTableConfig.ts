@@ -13,7 +13,8 @@ export type SyncableTable =
     | 'GeofenceEvent'
     | 'Threat'
     | 'RecognitionEvent'
-    | 'Encouragement';
+    | 'Encouragement'
+    | 'ContextAlert';
 
 // The pull side of a table's config. Absent for push-only tables (e.g. the training tables flow patient -> Supabase only and are never pulled back).
 interface PullConfig<TSupabaseRow = any> {
@@ -31,6 +32,7 @@ interface SyncTableConfig<TLocalRow = any, TSupabaseRow = any> {
     supabaseTable: keyof Database['public']['Tables'];
 
     primaryKey: string;
+    remotePrimaryKey?: string;
 
     readLocalRow: (rowId: string) => Promise<TLocalRow | null>;
 
@@ -50,6 +52,21 @@ function readByPrimaryKey(tableName: string, primaryKey: string) {
 }
 
 // Per-table configuration
+function formatToISOTimestamp(timeStr: string | null | undefined): string {
+    if (!timeStr) return new Date().toISOString();
+    if (timeStr.includes('T') || timeStr.includes('-')) {
+        const parsed = new Date(timeStr);
+        return isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
+    }
+    const match = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (match) {
+        const d = new Date();
+        d.setHours(parseInt(match[1], 10), parseInt(match[2], 10), parseInt(match[3] || '0', 10), 0);
+        return d.toISOString();
+    }
+    return new Date().toISOString();
+}
+
 export const syncTableConfig: Record<SyncableTable, SyncTableConfig> = {
     Patient: {
         supabaseTable: 'Patient',
@@ -205,7 +222,8 @@ export const syncTableConfig: Record<SyncableTable, SyncTableConfig> = {
 
     GeofenceEvent: {
         supabaseTable: 'GeofenceEvent',
-        primaryKey: 'geoevent_id',
+        primaryKey: 'geoEvent_id',
+        remotePrimaryKey: 'geoevent_id',
         readLocalRow: readByPrimaryKey('GeofenceEvent', 'geoEvent_id'),
         toSupabaseRow: (row) => ({
             // Supabase uses lowercase geoevent_id; local SQLite uses geoEvent_id
@@ -272,6 +290,43 @@ export const syncTableConfig: Record<SyncableTable, SyncTableConfig> = {
                 created_at: remote.created_at,
                 ack_time: remote.ack_time,
                 updated_at: remote.updated_at,
+            }),
+        },
+    },
+
+    ContextAlert: {
+        supabaseTable: 'ContextAlert',
+        primaryKey: 'ctxAlert_id',
+        remotePrimaryKey: 'ctxalert_id',
+        readLocalRow: readByPrimaryKey('ContextAlert', 'ctxAlert_id'),
+        toSupabaseRow: (row) => ({
+            ctxalert_id: row.ctxAlert_id,
+            patient_id: row.patient_id,
+            asset_id: row.asset_id ?? null,
+            ctxalert_msg: row.ctxAlert_msg,
+            ctxalert_desc: row.ctxAlert_desc ?? null,
+            ctxalert_type: row.ctxAlert_type ?? 'Reminder',
+            ctxalert_status: row.ctxAlert_status,
+            ctxalert_time: formatToISOTimestamp(row.ctxAlert_time as string),
+            ack_time: row.ack_time ?? null,
+            ack_status: row.ack_status,
+            frequency: row.frequency,
+        }),
+        pull: {
+            watermarkColumn: 'ctxalert_time',
+            scopeColumn: 'patient_id',
+            fromSupabaseRow: (remote) => ({
+                ctxAlert_id: remote.ctxalert_id,
+                patient_id: remote.patient_id,
+                asset_id: remote.asset_id,
+                ctxAlert_msg: remote.ctxalert_msg,
+                ctxAlert_desc: remote.ctxalert_desc,
+                ctxAlert_type: remote.ctxalert_type || 'Reminder',
+                ctxAlert_status: remote.ctxalert_status,
+                ctxAlert_time: remote.ctxalert_time,
+                ack_time: remote.ack_time,
+                ack_status: remote.ack_status,
+                frequency: remote.frequency,
             }),
         },
     },

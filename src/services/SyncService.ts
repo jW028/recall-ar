@@ -23,7 +23,7 @@ export interface PullSummary {
 }
 
 // Tables pulled from Supabase into local SQLite, in FK-safe order (a parent before anything that references it). Push-only tables are absent.
-const PULL_ORDER: SyncableTable[] = ['Patient', 'MemoryAsset', 'Encouragement'];
+const PULL_ORDER: SyncableTable[] = ['Patient', 'MemoryAsset', 'Encouragement', 'ContextAlert'];
 
 // The patient-scoped subset of PULL_ORDER. A caregiver device pulls Patient by caregiver_id first, then walks these per patient.
 const PATIENT_SCOPED_PULL_ORDER: SyncableTable[] = ['MemoryAsset', 'Encouragement'];
@@ -58,7 +58,7 @@ function toIsoUtc(value: unknown): string {
 async function getPendingSyncRows(): Promise<SyncLogRow[]> {
     const db = getDatabase();
     return db.getAllAsync<SyncLogRow>(
-    `SELECT sync_id, table_name, row_id, operation
+        `SELECT sync_id, table_name, row_id, operation
         FROM SyncLog
         WHERE synced = 0
         ORDER BY created_at ASC`
@@ -68,18 +68,18 @@ async function getPendingSyncRows(): Promise<SyncLogRow[]> {
 async function markSynced(syncId: string): Promise<void> {
     const db = getDatabase();
     await db.runAsync(
-    `UPDATE SyncLog SET synced = 1, last_attempt = datetime('now') WHERE sync_id = ?`,
-    [syncId]
+        `UPDATE SyncLog SET synced = 1, last_attempt = datetime('now') WHERE sync_id = ?`,
+        [syncId]
     );
 }
 
 async function markFailed(syncId: string, errorMessage: string): Promise<void> {
     const db = getDatabase();
     await db.runAsync(
-    `UPDATE SyncLog
+        `UPDATE SyncLog
         SET last_attempt = datetime('now'), error_message = ?
         WHERE sync_id = ?`,
-    [errorMessage, syncId]
+        [errorMessage, syncId]
     );
 }
 
@@ -89,32 +89,47 @@ async function pushRow(row: SyncLogRow): Promise<string | null> {
     const config = syncTableConfig[row.table_name];
 
     if (!config) {
-    return `No sync config registered for table "${row.table_name}"`;
+        return `No sync config registered for table "${row.table_name}"`;
     }
+
+    const remotePk = config.remotePrimaryKey || config.primaryKey;
 
     try {
-    if (row.operation === 'DELETE') {
+        if (row.operation === 'DELETE') {
+            const { error } = await supabase
+                .from(config.supabaseTable)
+                .delete()
+                .eq(remotePk, row.row_id);
+            if (error) {
+                console.error(`[SyncService] DELETE error on ${row.table_name}:`, error.message, error);
+                return error.message;
+            }
+            return null;
+        }
+
+        // INSERT and UPDATE both resolve to an upsert — this keeps the local and remote sides eventually consistent even if a row was modified twice locally before syncing (only the latest local state is pushed).
+        const localRow = await config.readLocalRow(row.row_id);
+        if (!localRow) {
+            // Row no longer exists locally (e.g. deleted right after an update was queued) — nothing to push, treat as success.
+            return null;
+        }
+
+        const supabaseRow = config.toSupabaseRow(localRow);
         const { error } = await supabase
-        .from(config.supabaseTable)
-        .delete()
-        .eq(config.primaryKey, row.row_id);
-        return error ? error.message : null;
-    }
+            .from(config.supabaseTable)
+            .upsert(supabaseRow, { onConflict: remotePk });
 
-    // INSERT and UPDATE both resolve to an upsert — this keeps the local and remote sides eventually consistent even if a row was modified twice locally before syncing (only the latest local state is pushed).
-    const localRow = await config.readLocalRow(row.row_id);
-    if (!localRow) {
-        // Row no longer exists locally (e.g. deleted right after an update was queued) — nothing to push, treat as success.
+        if (error) {
+            console.error(`[SyncService] UPSERT error on ${row.table_name} (${row.row_id}):`, error.message, error);
+            return error.message;
+        }
+
+        console.log(`[SyncService] Successfully pushed ${row.table_name} (${row.row_id}) to Supabase`);
         return null;
-    }
-
-    const { error } = await supabase
-        .from(config.supabaseTable)
-        .upsert(config.toSupabaseRow(localRow), { onConflict: config.primaryKey });
-
-    return error ? error.message : null;
     } catch (e) {
-    return e instanceof Error ? e.message : 'Unknown sync error';
+        const msg = e instanceof Error ? e.message : 'Unknown sync error';
+        console.error(`[SyncService] Exception pushing ${row.table_name}:`, msg, e);
+        return msg;
     }
 }
 
@@ -124,8 +139,8 @@ async function pushRow(row: SyncLogRow): Promise<string | null> {
 async function getWatermark(table: SyncableTable, scopeKey: string): Promise<string> {
     const db = getDatabase();
     const row = await db.getFirstAsync<{ last_pulled_at: string }>(
-    `SELECT last_pulled_at FROM SyncState WHERE table_name = ? AND scope_key = ?`,
-    [table, scopeKey]
+        `SELECT last_pulled_at FROM SyncState WHERE table_name = ? AND scope_key = ?`,
+        [table, scopeKey]
     );
     return row?.last_pulled_at ?? EPOCH;
 }
@@ -137,9 +152,9 @@ async function setWatermark(
 ): Promise<void> {
     const db = getDatabase();
     await db.runAsync(
-    `INSERT INTO SyncState (table_name, scope_key, last_pulled_at) VALUES (?, ?, ?)
+        `INSERT INTO SyncState (table_name, scope_key, last_pulled_at) VALUES (?, ?, ?)
         ON CONFLICT(table_name, scope_key) DO UPDATE SET last_pulled_at = excluded.last_pulled_at`,
-    [table, scopeKey, value]
+        [table, scopeKey, value]
     );
 }
 
@@ -153,14 +168,14 @@ async function upsertLocalRow(
     const columns = Object.keys(row);
     const placeholders = columns.map(() => '?').join(', ');
     const assignments = columns
-    .filter((c) => c !== primaryKey)
-    .map((c) => `${c} = excluded.${c}`)
-    .join(', ');
+        .filter((c) => c !== primaryKey)
+        .map((c) => `${c} = excluded.${c}`)
+        .join(', ');
 
     await db.runAsync(
-    `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})
+        `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})
         ON CONFLICT(${primaryKey}) DO UPDATE SET ${assignments}`,
-    columns.map((c) => row[c] as any)
+        columns.map((c) => row[c] as any)
     );
 }
 
@@ -171,20 +186,21 @@ async function shouldWrite(
     remote: Record<string, any>
 ): Promise<boolean> {
     const db = getDatabase();
-    const rowId = remote[config.primaryKey];
+    const localMapped = config.pull?.fromSupabaseRow(remote) ?? remote;
+    const rowId = localMapped[config.primaryKey] as string;
 
     // A local edit still waiting to be pushed wins this round — don't clobber it. Push will send it up; a later pull reconciles by updated_at.
     const pending = await db.getFirstAsync<{ one: number }>(
-    `SELECT 1 AS one FROM SyncLog WHERE table_name = ? AND row_id = ? AND synced = 0 LIMIT 1`,
-    [table, rowId]
+        `SELECT 1 AS one FROM SyncLog WHERE table_name = ? AND row_id = ? AND synced = 0 LIMIT 1`,
+        [table, rowId]
     );
     if (pending) return false;
 
     // Last-write-wins: skip if the local copy is the same age or newer. Both sides are normalised first — the local copy and the remote row store the same instant in different formats.
     const local = await config.readLocalRow(rowId);
     if (local && config.pull) {
-    const col = config.pull.watermarkColumn;
-    if (toIsoUtc(local[col]) >= toIsoUtc(remote[col])) return false;
+        const col = config.pull.watermarkColumn;
+        if (String(local[col]) >= String(remote[col])) return false;
     }
     return true;
 }
@@ -200,11 +216,11 @@ async function pullTable(
     const since = await getWatermark(table, scope.value);
 
     const { data, error } = await supabase
-    .from(config.supabaseTable)
-    .select('*')
-    .eq(scope.column, scope.value)
-    .gt(config.pull.watermarkColumn, since)
-    .order(config.pull.watermarkColumn, { ascending: true });
+        .from(config.supabaseTable)
+        .select('*')
+        .eq(scope.column, scope.value)
+        .gt(config.pull.watermarkColumn, since)
+        .order(config.pull.watermarkColumn, { ascending: true });
 
     if (error || !data) return { pulled: 0, skipped: 0 };
 
@@ -213,15 +229,15 @@ async function pullTable(
     let maxWatermark = since;
 
     for (const remote of data as Record<string, any>[]) {
-    if (await shouldWrite(table, config, remote)) {
-        await upsertLocalRow(config.supabaseTable, config.primaryKey, config.pull.fromSupabaseRow(remote));
-        pulled++;
-    } else {
-        skipped++;
-    }
-    // Advance past every row we've seen, written or not, so it isn't refetched.
-    const w = toIsoUtc(remote[config.pull.watermarkColumn]);
-    if (w > maxWatermark) maxWatermark = w;
+        if (await shouldWrite(table, config, remote)) {
+            await upsertLocalRow(config.supabaseTable, config.primaryKey, config.pull.fromSupabaseRow(remote));
+            pulled++;
+        } else {
+            skipped++;
+        }
+        // Advance past every row we've seen, written or not, so it isn't refetched.
+        const w = toIsoUtc(remote[config.pull.watermarkColumn]);
+        if (w > maxWatermark) maxWatermark = w;
     }
 
     if (maxWatermark !== since) await setWatermark(table, scope.value, maxWatermark);
@@ -232,7 +248,7 @@ async function pullTable(
 async function drainQueue(): Promise<SyncSummary> {
     // The local SQLite database may not have finished initializing yet (e.g. a reconnect event fires before DatabaseProvider has mounted). Treat this as "nothing to sync yet" rather than throwing.
     if (!isDatabaseReady()) {
-    return { attempted: 0, succeeded: 0, failed: 0 };
+        return { attempted: 0, succeeded: 0, failed: 0 };
     }
 
     const pendingRows = await getPendingSyncRows();
@@ -241,15 +257,15 @@ async function drainQueue(): Promise<SyncSummary> {
     let failed = 0;
 
     for (const row of pendingRows) {
-    const errorMessage = await pushRow(row);
+        const errorMessage = await pushRow(row);
 
-    if (errorMessage) {
-        await markFailed(row.sync_id, errorMessage);
-        failed++;
-    } else {
-        await markSynced(row.sync_id);
-        succeeded++;
-    }
+        if (errorMessage) {
+            await markFailed(row.sync_id, errorMessage);
+            failed++;
+        } else {
+            await markSynced(row.sync_id);
+            succeeded++;
+        }
     }
 
     return { attempted: pendingRows.length, succeeded, failed };
@@ -258,17 +274,17 @@ async function drainQueue(): Promise<SyncSummary> {
 // Pulls all pullable tables for one patient into local SQLite. This is the patient-device entry point. Safe to call alongside drainQueue; run push first, then pull.
 async function pullAll(patientId: string): Promise<PullSummary> {
     if (!isDatabaseReady()) {
-    return { pulled: 0, skipped: 0 };
+        return { pulled: 0, skipped: 0 };
     }
 
     let pulled = 0;
     let skipped = 0;
     for (const table of PULL_ORDER) {
-    const scopeColumn = syncTableConfig[table].pull?.scopeColumn;
-    if (!scopeColumn) continue;
-    const summary = await pullTable(table, { column: scopeColumn, value: patientId });
-    pulled += summary.pulled;
-    skipped += summary.skipped;
+        const scopeColumn = syncTableConfig[table].pull?.scopeColumn;
+        if (!scopeColumn) continue;
+        const summary = await pullTable(table, { column: scopeColumn, value: patientId });
+        pulled += summary.pulled;
+        skipped += summary.skipped;
     }
     return { pulled, skipped };
 }
@@ -276,12 +292,12 @@ async function pullAll(patientId: string): Promise<PullSummary> {
 // Pulls everything a caregiver device needs. Patient is fetched by caregiver_id because on a fresh device there is no local Patient row to derive a patient_id from; only once those land can the per-patient children be scoped. Without this, a caregiver device pushed its queue up and never pulled anything back down.
 async function pullAllForCaregiver(caregiverId: string): Promise<PullSummary> {
     if (!isDatabaseReady()) {
-    return { pulled: 0, skipped: 0 };
+        return { pulled: 0, skipped: 0 };
     }
 
     const patientSummary = await pullTable('Patient', {
-    column: 'caregiver_id',
-    value: caregiverId,
+        column: 'caregiver_id',
+        value: caregiverId,
     });
 
     let pulled = patientSummary.pulled;
@@ -289,18 +305,18 @@ async function pullAllForCaregiver(caregiverId: string): Promise<PullSummary> {
 
     const db = getDatabase();
     const patients = await db.getAllAsync<{ patient_id: string }>(
-    `SELECT patient_id FROM Patient WHERE caregiver_id = ?`,
-    [caregiverId]
+        `SELECT patient_id FROM Patient WHERE caregiver_id = ?`,
+        [caregiverId]
     );
 
     for (const { patient_id } of patients) {
-    for (const table of PATIENT_SCOPED_PULL_ORDER) {
-        const scopeColumn = syncTableConfig[table].pull?.scopeColumn;
-        if (!scopeColumn) continue;
-        const summary = await pullTable(table, { column: scopeColumn, value: patient_id });
-        pulled += summary.pulled;
-        skipped += summary.skipped;
-    }
+        for (const table of PATIENT_SCOPED_PULL_ORDER) {
+            const scopeColumn = syncTableConfig[table].pull?.scopeColumn;
+            if (!scopeColumn) continue;
+            const summary = await pullTable(table, { column: scopeColumn, value: patient_id });
+            pulled += summary.pulled;
+            skipped += summary.skipped;
+        }
     }
 
     return { pulled, skipped };
@@ -309,14 +325,23 @@ async function pullAllForCaregiver(caregiverId: string): Promise<PullSummary> {
 // Returns true if there are any changes waiting to be synced.
 async function hasPendingChanges(): Promise<boolean> {
     if (!isDatabaseReady()) {
-    return false;
+        return false;
     }
 
     const db = getDatabase();
     const row = await db.getFirstAsync<{ count: number }>(
-    `SELECT COUNT(*) as count FROM SyncLog WHERE synced = 0`
+        `SELECT COUNT(*) as count FROM SyncLog WHERE synced = 0`
     );
     return (row?.count ?? 0) > 0;
+}
+
+// Clears all entries from local SyncLog queue
+async function clearSyncQueue(): Promise<void> {
+    if (!isDatabaseReady()) {
+        return;
+    }
+    const db = getDatabase();
+    await db.runAsync(`DELETE FROM SyncLog`);
 }
 
 export const SyncService = {
@@ -324,4 +349,5 @@ export const SyncService = {
     pullAll,
     pullAllForCaregiver,
     hasPendingChanges,
+    clearSyncQueue,
 };
