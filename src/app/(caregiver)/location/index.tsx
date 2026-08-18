@@ -74,7 +74,6 @@ export default function GeofenceListScreen() {
     const handleRefreshLocation = async () => {
         setIsRefreshing(true);
         refreshGeofences();
-        refreshEvents();
         try {
             const { found, isLive, location } = await fetchLocation();
 
@@ -132,6 +131,7 @@ export default function GeofenceListScreen() {
                     );
                 }
             }
+            await refreshEvents();
         } finally {
             setIsRefreshing(false);
         }
