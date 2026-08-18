@@ -207,19 +207,19 @@ export default function CaregiverHomeScreen() {
                     onAddPatient={() => router.push('/(caregiver)/home/new-patient')}
                 />
 
-                <View style={[styles.threatCard, activeThreatsCount > 0 && styles.threatCardActive]}>
-                    <View style={styles.threatCardHeader}>
-                        <Ionicons name="warning" size={24} color={activeThreatsCount > 0 ? theme.error : theme.textMuted} />
-                        <Text style={[styles.threatCardTitle, activeThreatsCount > 0 && { color: theme.error }]}>
-                            {activeThreatsCount} Ongoing Threat{activeThreatsCount !== 1 ? 's' : ''}
-                        </Text>
-                    </View>
-                    {activeThreatsCount > 0 && (
+                {activeThreatsCount > 0 && (
+                    <View style={[styles.threatCard, styles.threatCardActive]}>
+                        <View style={styles.threatCardHeader}>
+                            <Ionicons name="warning" size={24} color={theme.error} />
+                            <Text style={[styles.threatCardTitle, { color: theme.error }]}>
+                                {activeThreatsCount} Ongoing Threat{activeThreatsCount !== 1 ? 's' : ''}
+                            </Text>
+                        </View>
                         <Pressable style={styles.threatButton} onPress={() => router.push('/(caregiver)/alerts')}>
                             <Text style={styles.threatButtonText}>View Alerts</Text>
                         </Pressable>
-                    )}
-                </View>
+                    </View>
+                )}
 
                 {/* The tiles below all read zero until something is enrolled, so name the next step outright */}
                 {!isLoadingAssets && assets.length === 0 && (
@@ -281,6 +281,14 @@ export default function CaregiverHomeScreen() {
                     label="Manage Alerts"
                     subtitle="View panic buttons and geofence threats"
                     onPress={() => router.push('/(caregiver)/alerts')}
+                    accent
+                />
+
+                <ActionRow
+                    icon="notifications"
+                    label="Contextual Reminders"
+                    subtitle="Schedule time & object-triggered alerts"
+                    onPress={() => router.push('/(caregiver)/context-alerts')}
                     accent
                 />
 
