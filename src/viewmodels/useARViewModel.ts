@@ -5,6 +5,7 @@ import { EngagementService } from '@/services/EngagementService';
 import { PairingService } from '@/services/PairingService';
 import { RecognitionService, type RecognitionResult } from '@/services/RecognitionService';
 import { useAuthStore } from '@/store/authStore';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
     useCameraDevice,
@@ -91,6 +92,18 @@ export function useARViewModel(): ARViewModelResult {
             RecognitionService.teardown();
         };
     }, [patientId]);
+
+    // buildIndex snapshots the local rows into memory and processFrame never reads SQLite again, so without
+    // this a memory enrolled after the tab first opened is invisible until the app restarts — and one the
+    // caregiver deleted or paused stays recognisable. The ready guard keeps it off a half-loaded model.
+    useFocusEffect(
+        useCallback(() => {
+            if (!patientId || !isReadyRef.current) return;
+            RecognitionService.refreshIndex(patientId).catch((err: unknown) => {
+                console.warn('[ARView] Failed to refresh recognition index:', err);
+            });
+        }, [patientId])
+    );
 
     // The session is dead once this fires, so restarting it is the only way back. Attempts are capped so a
     // genuinely broken camera surfaces an error instead of restarting forever.

@@ -1,3 +1,4 @@
+import { resolveEncouragementIcon } from '@/constants/encouragementPresets';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Encouragement } from '@/models/Encouragement';
@@ -34,6 +35,9 @@ export function EncouragementBanner({ encouragement, caregiverName, onDismiss }:
 
     if (!encouragement) return null;
 
+    // Null for a stored value we cannot draw, in which case it is shown as text so it never silently vanishes.
+    const icon = resolveEncouragementIcon(encouragement.emoji);
+
     return (
         <Animated.View style={[styles.card, animatedStyle]}>
             <View style={styles.headerRow}>
@@ -42,10 +46,13 @@ export function EncouragementBanner({ encouragement, caregiverName, onDismiss }:
                     A message from {caregiverName ?? 'your caregiver'}
                 </Text>
             </View>
-            <Text style={styles.message}>
-                {encouragement.emoji ? `${encouragement.emoji} ` : ''}
-                {encouragement.message}
-            </Text>
+            <View style={styles.messageRow}>
+                {icon && <Ionicons name={icon} size={22} color={theme.primary} />}
+                <Text style={styles.message}>
+                    {!icon && encouragement.emoji ? `${encouragement.emoji} ` : ''}
+                    {encouragement.message}
+                </Text>
+            </View>
             <Pressable style={styles.thanksButton} onPress={onDismiss}>
                 <Text style={styles.thanksButtonText}>Thanks!</Text>
             </Pressable>
@@ -73,7 +80,13 @@ function createStyles(theme: Theme) {
             fontWeight: '700',
             color: theme.primaryText,
         },
+        messageRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+        },
         message: {
+            flex: 1,
             fontSize: 20,
             fontWeight: '600',
             color: theme.body,

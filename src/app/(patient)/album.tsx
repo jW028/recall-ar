@@ -7,6 +7,7 @@ import { useCaregiverName } from '@/hooks/useCaregiverName';
 import { useTheme } from '@/hooks/use-theme';
 import type { MemoryAsset } from '@/models/MemoryAsset';
 import { useAlbumViewModel } from '@/viewmodels/useAlbumViewModel';
+import { Ionicons } from '@expo/vector-icons';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, SectionList, StyleSheet, Text, View } from 'react-native';
 
@@ -20,8 +21,8 @@ export default function AlbumScreen() {
     const sections = useMemo(
         () =>
             [
-                { title: 'Memories you know well ⭐', data: mastered },
-                { title: "Memories you're learning", data: learning },
+                { title: 'Memories you know well', icon: 'star' as const, data: mastered },
+                { title: "Memories you're learning", icon: null, data: learning },
             ].filter((s) => s.data.length > 0),
         [mastered, learning]
     );
@@ -66,7 +67,10 @@ export default function AlbumScreen() {
                 contentContainerStyle={styles.content}
                 ListHeaderComponent={<Text style={styles.title}>Your Album</Text>}
                 renderSectionHeader={({ section }) => (
-                    <Text style={styles.sectionHeader}>{section.title}</Text>
+                    <View style={styles.sectionHeaderRow}>
+                        <Text style={styles.sectionHeader}>{section.title}</Text>
+                        {section.icon && <Ionicons name={section.icon} size={18} color={theme.warning} />}
+                    </View>
                 )}
                 renderItem={({ item }) => (
                     <View style={styles.cardWrap}>
@@ -99,12 +103,17 @@ function createStyles(theme: Theme) {
             color: theme.heading,
             marginBottom: 8,
         },
+        sectionHeaderRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            marginTop: 20,
+            marginBottom: 12,
+        },
         sectionHeader: {
             fontSize: 18,
             fontWeight: '700',
             color: theme.body,
-            marginTop: 20,
-            marginBottom: 12,
         },
         cardWrap: {
             marginBottom: 16,

@@ -5,13 +5,15 @@ import {
     type UpdatePatientParams,
 } from '@/services/PatientService';
 import { SyncService } from '@/services/SyncService';
-import { useCallback, useEffect, useState } from 'react';
+import type { RefreshOptions } from '@/viewmodels/useMemoryAssetViewModel';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface UsePatientListViewModel {
     patients: Patient[];
     isLoading: boolean;
     error: string | null;
-    refresh: () => Promise<void>;
+    refresh: (opts?: RefreshOptions) => Promise<void>;
     createPatient: (params: CreatePatientParams) => Promise<boolean>;
     isCreating: boolean;
     createError: string | null;
@@ -28,25 +30,39 @@ caregiverId: string | undefined
     const [isCreating, setIsCreating] = useState(false);
     const [createError, setCreateError] = useState<string | null>(null);
 
-    const refresh = useCallback(async () => {
-        if (!caregiverId) return;
+    const inFlightRef = useRef<Promise<void> | null>(null);
 
-        setIsLoading(true);
+    const refresh = useCallback((opts?: RefreshOptions): Promise<void> => {
+        if (!caregiverId) return Promise.resolve();
+        // Only silent (focus) reloads join an in-flight run; an explicit refresh always executes.
+        if (opts?.silent && inFlightRef.current) return inFlightRef.current;
+
+        if (!opts?.silent) setIsLoading(true);
         setError(null);
 
-        const result = await PatientService.getPatientsByCaregiver(caregiverId);
+        const run = (async () => {
+            const result = await PatientService.getPatientsByCaregiver(caregiverId);
+            if (result.error) {
+                setError(result.error);
+            } else {
+                setPatients(result.data ?? []);
+            }
+            setIsLoading(false);
+        })().finally(() => {
+            inFlightRef.current = null;
+        });
 
-        if (result.error) {
-        setError(result.error);
-        } else {
-        setPatients(result.data ?? []);
-        }
-        setIsLoading(false);
+        inFlightRef.current = run;
+        return run;
     }, [caregiverId]);
 
-    useEffect(() => {
-        refresh();
-    }, [refresh]);
+    // The dashboard stays mounted, so focus is what picks up a patient created, renamed or deleted on a
+    // pushed screen — including one whose own copy of this viewmodel was unmounted before it could matter.
+    useFocusEffect(
+        useCallback(() => {
+            refresh({ silent: true });
+        }, [refresh])
+    );
 
     // Hydrate this device when the caregiverId is first set (new device / multi-device),
     // rather than waiting for the next background sync cycle. Goes through SyncService so

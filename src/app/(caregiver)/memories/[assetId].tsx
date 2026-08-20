@@ -262,9 +262,7 @@ export default function AssetDetailScreen() {
                 showBack
                 right={
                     !isEditing ? (
-                        <Pressable onPress={() => setIsEditing(true)} hitSlop={6}>
-                            <Text style={styles.editLink}>Edit</Text>
-                        </Pressable>
+                        <Button label="Edit" variant="ghost" size="sm" onPress={() => setIsEditing(true)} />
                     ) : null
                 }
             />
@@ -477,16 +475,19 @@ export default function AssetDetailScreen() {
                     )}
 
                     <View style={styles.editActions}>
-                        <Pressable style={styles.cancelButton} onPress={cancelEdit}>
-                            <Text style={styles.cancelButtonText}>Cancel</Text>
-                        </Pressable>
-                        <Pressable
-                            style={[styles.saveButton, !canSave && styles.saveButtonDisabled]}
+                        <Button
+                            label="Cancel"
+                            variant="outline"
+                            onPress={cancelEdit}
+                            style={styles.editAction}
+                        />
+                        <Button
+                            label={saveButtonLabel}
                             onPress={handleSave}
                             disabled={!canSave}
-                        >
-                            <Text style={styles.saveButtonText}>{saveButtonLabel}</Text>
-                        </Pressable>
+                            loading={photoStep === 'processing' || photoStep === 'saving' || isUpdating}
+                            style={styles.editAction}
+                        />
                     </View>
                 </View>
             )}
@@ -535,11 +536,6 @@ function createStyles(theme: Theme) {
             flex: 1,
             justifyContent: 'center',
             alignItems: 'center',
-        },
-        editLink: {
-            fontSize: 15,
-            fontWeight: '600',
-            color: theme.primary,
         },
         heroImage: {
             width: '100%',
@@ -647,24 +643,7 @@ function createStyles(theme: Theme) {
         },
         textArea: { minHeight: 80 },
         editActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
-        cancelButton: {
-            flex: 1,
-            paddingVertical: 14,
-            alignItems: 'center',
-            borderRadius: 10,
-            borderWidth: 1,
-            borderColor: theme.borderStrong,
-        },
-        cancelButtonText: { color: theme.label, fontSize: 15, fontWeight: '600' },
-        saveButton: {
-            flex: 1,
-            backgroundColor: theme.primary,
-            paddingVertical: 14,
-            alignItems: 'center',
-            borderRadius: 10,
-        },
-        saveButtonDisabled: { backgroundColor: theme.primaryDisabled },
-        saveButtonText: { color: theme.onPrimary, fontSize: 15, fontWeight: '600' },
+        editAction: { flex: 1 },
         pauseSection: { marginBottom: 20, gap: 8 },
         pauseHint: { fontSize: 13, color: theme.textMuted, lineHeight: 19, textAlign: 'center' },
         deleteButton: {

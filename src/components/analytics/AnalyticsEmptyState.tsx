@@ -1,5 +1,6 @@
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { Ionicons } from '@expo/vector-icons';
 import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -10,7 +11,7 @@ export function AnalyticsEmptyState() {
 
     return (
         <View style={styles.container}>
-            <Text style={styles.icon}>📊</Text>
+            <Ionicons name="stats-chart-outline" size={40} color={theme.textFaint} style={styles.icon} />
             <Text style={styles.title}>No analytics yet</Text>
             <Text style={styles.body}>
                 The patient must complete at least one Memory Quiz session before cognitive analytics can be shown.
@@ -27,7 +28,6 @@ function createStyles(theme: Theme) {
             paddingHorizontal: 24,
         },
         icon: {
-            fontSize: 40,
             marginBottom: 12,
         },
         title: {

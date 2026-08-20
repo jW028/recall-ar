@@ -1,4 +1,5 @@
 import { CurrentPatientChip } from '@/components/caregiver/CurrentPatientChip';
+import { EmptyState } from '@/components/common/EmptyState';
 import { Screen } from '@/components/common/Screen';
 import { ScreenHeader } from '@/components/common/ScreenHeader';
 import type { Theme } from '@/constants/theme';
@@ -153,13 +154,11 @@ export default function ThreatListScreen() {
             />
 
             {threats.length === 0 ? (
-                <View style={styles.emptyState}>
-                    <Text style={styles.emptyIcon}>✅</Text>
-                    <Text style={styles.emptyTitle}>No threats detected</Text>
-                    <Text style={styles.emptySubtitle}>
-                        Threat alerts will appear here when boundary violations are flagged.
-                    </Text>
-                </View>
+                <EmptyState
+                    icon="shield-checkmark-outline"
+                    title="No threats detected"
+                    body="Threat alerts will appear here when boundary violations are flagged."
+                />
             ) : (
                 <FlatList
                     data={threats}
@@ -388,28 +387,6 @@ function createStyles(theme: Theme) {
             color: theme.onPrimary,
             fontWeight: '600',
             fontSize: 14,
-        },
-        emptyState: {
-            flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-            paddingHorizontal: 24,
-        },
-        emptyIcon: {
-            fontSize: 48,
-            marginBottom: 12,
-        },
-        emptyTitle: {
-            fontSize: 18,
-            fontWeight: '700',
-            color: theme.heading,
-            marginBottom: 8,
-        },
-        emptySubtitle: {
-            fontSize: 14,
-            color: theme.textMuted,
-            textAlign: 'center',
-            paddingHorizontal: 24,
         },
         errorText: {
             color: theme.error,

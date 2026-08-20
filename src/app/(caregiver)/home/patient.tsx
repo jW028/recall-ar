@@ -1,5 +1,6 @@
 import { AvatarPicker } from '@/components/caregiver/AvatarPicker';
 import { Avatar } from '@/components/common/Avatar';
+import { Button } from '@/components/common/Button';
 import { Screen } from '@/components/common/Screen';
 import { ScreenHeader } from '@/components/common/ScreenHeader';
 import type { Theme } from '@/constants/theme';
@@ -23,6 +24,7 @@ import {
 export default function PatientDetailScreen() {
     const id = useCurrentPatientId() ?? undefined;
     const setCurrentPatient = useCurrentPatientStore((s) => s.setCurrentPatient);
+    const clearCurrentPatient = useCurrentPatientStore((s) => s.clear);
     const router = useRouter();
     const theme = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
@@ -115,7 +117,11 @@ export default function PatientDetailScreen() {
             style: 'destructive',
             onPress: async () => {
             const success = await deletePatient();
-            if (success) router.back();
+            if (!success) return;
+            // The selection is persisted to AsyncStorage, so leaving it pointing at the deleted patient
+            // would have every other tab querying a dead id across restarts. Home re-selects on focus.
+            clearCurrentPatient();
+            router.back();
             },
         },
         ]
@@ -155,9 +161,7 @@ export default function PatientDetailScreen() {
         showBack
         right={
             !isEditing ? (
-            <Pressable onPress={() => setIsEditing(true)} hitSlop={6}>
-                <Text style={styles.editLink}>Edit</Text>
-            </Pressable>
+            <Button label="Edit" variant="ghost" size="sm" onPress={() => setIsEditing(true)} />
             ) : null
         }
         />
@@ -240,18 +244,18 @@ export default function PatientDetailScreen() {
             </View>
 
             <View style={styles.editActions}>
-            <Pressable style={styles.cancelButton} onPress={handleCancel}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-            </Pressable>
-            <Pressable
-                style={styles.saveButton}
+            <Button
+                label="Cancel"
+                variant="outline"
+                onPress={handleCancel}
+                style={styles.editAction}
+            />
+            <Button
+                label={isUploadingAvatar ? 'Uploading…' : isUpdating ? 'Saving…' : 'Save'}
                 onPress={handleSave}
-                disabled={isUpdating || isUploadingAvatar}
-            >
-                <Text style={styles.saveButtonText}>
-                {isUploadingAvatar ? 'Uploading…' : isUpdating ? 'Saving…' : 'Save'}
-                </Text>
-            </Pressable>
+                loading={isUpdating || isUploadingAvatar}
+                style={styles.editAction}
+            />
             </View>
         </View>
         )}
@@ -310,11 +314,6 @@ function createStyles(theme: Theme) {
     },
     avatarView: { alignItems: 'center', marginBottom: 20 },
     avatarEdit: { alignItems: 'center', marginBottom: 20 },
-    editLink: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: theme.primary,
-    },
     errorBox: {
     backgroundColor: theme.errorBackground,
     borderColor: theme.errorBorder,
@@ -381,30 +380,8 @@ function createStyles(theme: Theme) {
     gap: 12,
     marginTop: 8,
     },
-    cancelButton: {
+    editAction: {
     flex: 1,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: theme.borderStrong,
-    },
-    cancelButtonText: {
-    color: theme.label,
-    fontSize: 15,
-    fontWeight: '600',
-    },
-    saveButton: {
-    flex: 1,
-    backgroundColor: theme.primary,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderRadius: 10,
-    },
-    saveButtonText: {
-    color: theme.onPrimary,
-    fontSize: 15,
-    fontWeight: '600',
     },
     pairButton: {
     backgroundColor: theme.primaryMuted,

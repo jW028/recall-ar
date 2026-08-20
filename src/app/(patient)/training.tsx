@@ -1,3 +1,4 @@
+import { Button } from '@/components/common/Button';
 import { ChoiceButton, PhotoChoiceButton, type ChoiceState } from '@/components/patient/ChoiceButton';
 import { ChoicesReveal } from '@/components/patient/ChoicesReveal';
 import { CorrectCelebration } from '@/components/patient/CorrectCelebration';
@@ -105,9 +106,7 @@ export default function TrainingScreen() {
                 <Text style={styles.message} numberOfLines={4}>
                     {error ?? 'Something went wrong.'}
                 </Text>
-                <Pressable style={styles.primaryButton} onPress={goHome}>
-                    <Text style={styles.primaryButtonText}>Go back</Text>
-                </Pressable>
+                <Button label="Go back" size="lg" onPress={goHome} />
             </View>
         );
     }
@@ -133,9 +132,7 @@ export default function TrainingScreen() {
                     {caregiverName ?? 'Your caregiver'} hasn&apos;t added any memories yet. They will
                     show up here once they do.
                 </Text>
-                <Pressable style={styles.primaryButton} onPress={goHome}>
-                    <Text style={styles.primaryButtonText}>Home</Text>
-                </Pressable>
+                <Button label="Home" size="lg" onPress={goHome} />
             </View>
         );
     }
@@ -149,21 +146,13 @@ export default function TrainingScreen() {
                 </Text>
                 {/* Offered, never required: nothing here is due, so this is a way to keep going rather than a task */}
                 {practiceAvailable ? (
-                    <Pressable
-                        style={styles.primaryButton}
-                        onPress={startPractice}
-                        accessibilityRole="button"
-                    >
-                        <Text style={styles.primaryButtonText}>Practice anyway</Text>
-                    </Pressable>
+                    <Button label="Practice anyway" size="lg" onPress={startPractice} />
                 ) : (
-                    <Pressable
-                        style={styles.primaryButton}
+                    <Button
+                        label="Browse your album"
+                        size="lg"
                         onPress={() => router.navigate('/(patient)/album')}
-                        accessibilityRole="button"
-                    >
-                        <Text style={styles.primaryButtonText}>Browse your album</Text>
-                    </Pressable>
+                    />
                 )}
                 <Pressable onPress={goHome} hitSlop={8} accessibilityRole="button">
                     <Text style={styles.secondaryLink}>Home</Text>
@@ -247,13 +236,7 @@ export default function TrainingScreen() {
                 <View style={styles.spacer} />
 
                 <View style={styles.footerSlot}>
-                    <Pressable
-                        style={styles.primaryButton}
-                        onPress={next}
-                        accessibilityRole="button"
-                    >
-                        <Text style={styles.primaryButtonText}>Got it</Text>
-                    </Pressable>
+                    <Button label="Got it" size="lg" onPress={next} />
                 </View>
             </View>
         );
@@ -366,13 +349,7 @@ export default function TrainingScreen() {
             {/* Always mounted so the Continue button's space is reserved from the start and the reveal shifts nothing */}
             <View style={styles.footerSlot}>
                 {revealed ? (
-                    <Pressable
-                        style={styles.primaryButton}
-                        onPress={handleNext}
-                        accessibilityRole="button"
-                    >
-                        <Text style={styles.primaryButtonText}>Continue</Text>
-                    </Pressable>
+                    <Button label="Continue" size="lg" onPress={handleNext} />
                 ) : error ? (
                     // Submit errors can only occur before the reveal, so they borrow the reserved slot instead of displacing content
                     <View style={styles.errorBanner}>
@@ -532,18 +509,6 @@ function createStyles(theme: Theme, compact: boolean) {
             lineHeight: compact ? 24 : 26,
             color: theme.body,
             textAlign: 'center',
-        },
-        primaryButton: {
-            backgroundColor: theme.primary,
-            borderRadius: 14,
-            paddingVertical: compact ? 14 : 16,
-            paddingHorizontal: 48,
-            alignItems: 'center',
-        },
-        primaryButtonText: {
-            color: theme.onPrimary,
-            fontSize: 18,
-            fontWeight: '700',
         },
         doneTitle: {
             fontSize: 28,

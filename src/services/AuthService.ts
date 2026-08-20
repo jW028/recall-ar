@@ -9,6 +9,9 @@ export interface AuthUser {
     email: string;
     role: UserRole;
     fullName: string;
+    // Caregiver profile fields the account screens edit. Empty/null for a patient, which has no Caregiver row.
+    contact: string;
+    imageUrl: string | null;
 }
 
 export interface SignInParams {
@@ -40,7 +43,7 @@ async function resolveAuthUser(user: User): Promise<AuthUser | null> {
     if (role === 'caregiver') {
         const { data, error } = await supabase
             .from('Caregiver')
-            .select('full_name')
+            .select('full_name, caregiver_contact, image_url')
             .eq('caregiver_id', user.id)
             .single();
 
@@ -51,6 +54,8 @@ async function resolveAuthUser(user: User): Promise<AuthUser | null> {
                 email: user.email ?? '',
                 role: 'caregiver',
                 fullName: data.full_name,
+                contact: data.caregiver_contact,
+                imageUrl: data.image_url,
             };
         }
 
@@ -77,6 +82,8 @@ async function resolveAuthUser(user: User): Promise<AuthUser | null> {
             email: user.email ?? '',
             role: 'caregiver',
             fullName,
+            contact,
+            imageUrl: null,
         };
     }
 
@@ -86,6 +93,8 @@ async function resolveAuthUser(user: User): Promise<AuthUser | null> {
         email: user.email ?? '',
         role: 'patient',
         fullName: user.user_metadata?.full_name ?? '',
+        contact: '',
+        imageUrl: null,
     };
 }
 
@@ -174,6 +183,8 @@ async function signUp(
             email: data.user.email ?? '',
             role: 'caregiver',
             fullName: params.fullName,
+            contact: params.contact,
+            imageUrl: null,
         },
         error: null,
     };

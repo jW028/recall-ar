@@ -6,7 +6,9 @@ import {
     type UpdateGeofenceParams,
 } from '@/services/GeofenceService';
 import { LocationService, type PatientLocationData } from '@/services/LocationService';
-import { useCallback, useEffect, useState } from 'react';
+import type { RefreshOptions } from '@/viewmodels/useMemoryAssetViewModel';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 
 // ── Geofence List ─────────────────────────────────────────────────
@@ -14,7 +16,7 @@ interface UseGeofenceListViewModel {
     geofences: Geofence[];
     isLoading: boolean;
     error: string | null;
-    refresh: () => Promise<void>;
+    refresh: (opts?: RefreshOptions) => Promise<void>;
     createGeofence: (params: CreateGeofenceParams) => Promise<boolean>;
     isCreating: boolean;
     createError: string | null;
@@ -31,24 +33,42 @@ export function useGeofenceListViewModel(
     const [isCreating, setIsCreating] = useState(false);
     const [createError, setCreateError] = useState<string | null>(null);
 
-    const refresh = useCallback(async () => {
-        if (!patientId) return;
-        setIsLoading(true);
+    const inFlightRef = useRef<Promise<void> | null>(null);
+
+    const refresh = useCallback((opts?: RefreshOptions): Promise<void> => {
+        if (!patientId) return Promise.resolve();
+        // Only silent (focus) reloads join an in-flight run; an explicit refresh always executes.
+        if (opts?.silent && inFlightRef.current) return inFlightRef.current;
+
+        if (!opts?.silent) setIsLoading(true);
         setError(null);
 
-        // Geofence has no updated_at column, so it can't join the watermarked pull in SyncService. Pull the full set first, the same way useThreatViewModel does, otherwise geofences created on another device never reach this one. Best-effort: offline falls back to whatever is already local.
-        await GeofenceService.pullGeofencesFromCloud(patientId).catch(() => {});
+        const run = (async () => {
+            // Geofence has no updated_at column, so it can't join the watermarked pull in SyncService. Pull the full set first, the same way useThreatViewModel does, otherwise geofences created on another device never reach this one. Best-effort: offline falls back to whatever is already local.
+            await GeofenceService.pullGeofencesFromCloud(patientId).catch(() => {});
 
-        const result = await GeofenceService.getGeofencesByPatient(patientId);
-        if (result.error) {
-            setError(result.error);
-        } else {
-            setGeofences(result.data ?? []);
-        }
-        setIsLoading(false);
+            const result = await GeofenceService.getGeofencesByPatient(patientId);
+            if (result.error) {
+                setError(result.error);
+            } else {
+                setGeofences(result.data ?? []);
+            }
+            setIsLoading(false);
+        })().finally(() => {
+            inFlightRef.current = null;
+        });
+
+        inFlightRef.current = run;
+        return run;
     }, [patientId]);
 
-    useEffect(() => { refresh(); }, [refresh]);
+    // location/create.tsx and location/[geofenceId].tsx mutate their own copies of this viewmodel and then
+    // unmount, so the map screen only learns about a new or edited safe zone when it regains focus.
+    useFocusEffect(
+        useCallback(() => {
+            refresh({ silent: true });
+        }, [refresh])
+    );
 
     const createGeofence = useCallback(
         async (params: CreateGeofenceParams): Promise<boolean> => {

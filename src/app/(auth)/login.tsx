@@ -1,3 +1,4 @@
+import { Button } from '@/components/common/Button';
 import { FormField } from '@/components/common/FormField';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -8,7 +9,6 @@ import { useMemo, useState } from 'react';
 import {
     KeyboardAvoidingView,
     Platform,
-    Pressable,
     ScrollView,
     StyleSheet,
     Text,
@@ -95,15 +95,13 @@ export default function LoginScreen() {
           onSubmitEditing={handleSubmit}
         />
 
-        <Pressable
-          style={[styles.button, !isFormValid && styles.buttonDisabled]}
+        <Button
+          label={isSubmitting ? 'Signing in…' : 'Sign in'}
           onPress={handleSubmit}
-          disabled={!isFormValid || isSubmitting}
-        >
-          <Text style={styles.buttonText}>
-            {isSubmitting ? 'Signing in…' : 'Sign in'}
-          </Text>
-        </Pressable>
+          disabled={!isFormValid}
+          loading={isSubmitting}
+          style={styles.submit}
+        />
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>Don't have an account? </Text>
@@ -156,15 +154,7 @@ function createStyles(theme: Theme) {
       marginBottom: 16,
     },
     errorText: { color: theme.error, fontSize: 14 },
-    button: {
-      backgroundColor: theme.primary,
-      borderRadius: 10,
-      paddingVertical: 16,
-      alignItems: 'center',
-      marginTop: 8,
-    },
-    buttonDisabled: { backgroundColor: theme.primaryDisabled },
-    buttonText: { color: theme.onPrimary, fontSize: 16, fontWeight: '600' },
+    submit: { marginTop: 8 },
     footer: {
       flexDirection: 'row',
       justifyContent: 'center',

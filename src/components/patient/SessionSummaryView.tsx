@@ -1,3 +1,4 @@
+import { Button } from '@/components/common/Button';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { SessionSummary } from '@/models/TrainingSession';
@@ -101,7 +102,7 @@ export function SessionSummaryView({ summary, streakDays, onDone, onBrowseAlbum,
 
     const rememberedLine =
         summary.correct > 0
-            ? `You remembered ${counted} ${counted === 1 ? 'memory' : 'memories'} today ⭐`
+            ? `You remembered ${counted} ${counted === 1 ? 'memory' : 'memories'} today`
             : `You practiced ${summary.answered} ${summary.answered === 1 ? 'memory' : 'memories'} today — every review helps.`;
 
     // This view cannot scroll, so the mastered list is capped instead of being allowed to push the Done button off screen
@@ -136,7 +137,7 @@ export function SessionSummaryView({ summary, streakDays, onDone, onBrowseAlbum,
             {streakDays !== undefined && streakDays >= 1 && (
                 <Staggered delay={STAGGER_MS * 3} animate={animate}>
                     <Text style={styles.streak} numberOfLines={1}>
-                        That&apos;s {streakDays} {streakDays === 1 ? 'day' : 'days'} in a row ⭐
+                        That&apos;s {streakDays} {streakDays === 1 ? 'day' : 'days'} in a row
                     </Text>
                 </Staggered>
             )}
@@ -149,13 +150,7 @@ export function SessionSummaryView({ summary, streakDays, onDone, onBrowseAlbum,
                     <Text style={styles.albumLink}>See it in your album</Text>
                 </Pressable>
             )}
-            <Pressable
-                style={styles.primaryButton}
-                onPress={onDone}
-                accessibilityRole="button"
-            >
-                <Text style={styles.primaryButtonText}>Done</Text>
-            </Pressable>
+            <Button label="Done" size="lg" onPress={onDone} style={styles.done} />
             {/* Secondary by design: the session is finished, and more practice is an offer, not a task */}
             {onPractice && (
                 <Pressable onPress={onPractice} hitSlop={8} accessibilityRole="button">
@@ -215,18 +210,8 @@ function createStyles(theme: Theme) {
             fontWeight: '600',
             color: theme.primary,
         },
-        primaryButton: {
-            backgroundColor: theme.primary,
-            borderRadius: 14,
-            paddingVertical: 18,
-            paddingHorizontal: 48,
-            alignItems: 'center',
+        done: {
             marginTop: 8,
-        },
-        primaryButtonText: {
-            color: theme.onPrimary,
-            fontSize: 18,
-            fontWeight: '700',
         },
     });
 }

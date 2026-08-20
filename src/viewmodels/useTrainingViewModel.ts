@@ -11,6 +11,7 @@ import { PairingService } from '@/services/PairingService';
 import { SyncService } from '@/services/SyncService';
 import { TrainingService } from '@/services/TrainingService';
 import { appendRetry, buildSteps, nextFraction, summarizeAttempts } from '@/utils/sessionSteps';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 // 'empty' means nothing is due yet, 'unenrolled' means the caregiver has added nothing to review at all
@@ -94,9 +95,14 @@ export function useTrainingViewModel(): UseTrainingViewModel {
         setQuestion(result.data);
     }, []);
 
-    // Build the session's steps once on mount.
-    useEffect(() => {
-        (async () => {
+    // Builds the session's steps from scratch, resetting every per-session accumulator. Because of that
+    // reset it must never run over a session already in progress — see the focus effect below.
+    const buildingRef = useRef(false);
+
+    const buildSession = useCallback(async () => {
+        if (buildingRef.current) return;
+        buildingRef.current = true;
+        try {
             const pairing = await PairingService.getPersistedPairing();
             if (!mountedRef.current) return;
             if (!pairing) {
@@ -131,10 +137,32 @@ export function useTrainingViewModel(): UseTrainingViewModel {
             }
             const planned = buildSteps(result.data);
             setSteps(planned);
+            setIndex(0);
+            setAttempts([]);
+            setMasteredNames([]);
+            setProgressFraction(0);
+            setLastResult(null);
+            setError(null);
             setStatus('ready');
             await loadStep(planned[0], pairing.patientId);
-        })();
+        } finally {
+            buildingRef.current = false;
+        }
     }, [loadStep]);
+
+    // Read during the focus effect, which would otherwise close over a stale status.
+    const statusRef = useRef(status);
+    statusRef.current = status;
+
+    // The Review tab never unmounts, so a mount-only build left the patient looking at the finished
+    // session's summary forever, or at "nothing added yet" long after the caregiver enrolled something.
+    useFocusEffect(
+        useCallback(() => {
+            // A live session must survive tabbing away — rebuilding would discard answers already given.
+            if (statusRef.current === 'ready') return;
+            buildSession();
+        }, [buildSession])
+    );
 
     // Fetch the streak for the summary screen once the session finishes; today's answers are already persisted by then.
     useEffect(() => {

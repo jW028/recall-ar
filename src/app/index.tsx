@@ -1,12 +1,14 @@
 
+import { Button } from '@/components/common/Button';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { Link } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 export default function Index() {
 	const theme = useTheme();
+	const router = useRouter();
 	const styles = useMemo(() => createStyles(theme), [theme]);
 
 	return (
@@ -20,17 +22,8 @@ export default function Index() {
 			</View>
 
 			<View style={styles.actions}>
-				<Link href="/login" asChild>
-					<Pressable style={styles.primaryButton}>
-						<Text style={styles.primaryButtonText}>Login</Text>
-					</Pressable>
-				</Link>
-
-				<Link href="/register" asChild>
-					<Pressable style={styles.secondaryButton}>
-						<Text style={styles.secondaryButtonText}>Sign up</Text>
-					</Pressable>
-				</Link>
+				<Button label="Login" onPress={() => router.push('/login')} />
+				<Button label="Sign up" variant="secondary" onPress={() => router.push('/register')} />
 			</View>
 		</View>
 	);
@@ -70,28 +63,6 @@ function createStyles(theme: Theme) {
 		},
 		actions: {
 			gap: 12,
-		},
-		primaryButton: {
-			backgroundColor: theme.primary,
-			borderRadius: 14,
-			paddingVertical: 16,
-			alignItems: 'center',
-		},
-		primaryButtonText: {
-			color: theme.onPrimary,
-			fontSize: 16,
-			fontWeight: '700',
-		},
-		secondaryButton: {
-			backgroundColor: theme.buttonSecondaryBackground,
-			borderRadius: 14,
-			paddingVertical: 16,
-			alignItems: 'center',
-		},
-		secondaryButtonText: {
-			color: theme.heading,
-			fontSize: 16,
-			fontWeight: '700',
 		},
 	});
 }

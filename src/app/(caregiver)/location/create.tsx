@@ -1,10 +1,12 @@
 import { CurrentPatientChip } from '@/components/caregiver/CurrentPatientChip';
+import { Button } from '@/components/common/Button';
 import { Screen } from '@/components/common/Screen';
 import { ScreenHeader } from '@/components/common/ScreenHeader';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useCurrentPatient, useCurrentPatientId } from '@/store/currentPatientStore';
 import { useGeofenceListViewModel } from '@/viewmodels/useGeofenceViewModels';
+import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -233,16 +235,12 @@ export default function GeofenceCreateScreen() {
                 title="New Safe Zone"
                 showBack
                 right={
-                    <Pressable
-                        style={[styles.saveBtn, isUpdating && styles.saveBtnDisabled]}
+                    <Button
+                        label={isUpdating ? 'Saving…' : 'Save'}
+                        size="sm"
                         onPress={handleSave}
-                        disabled={isUpdating}
-                    >
-                        {isUpdating
-                            ? <ActivityIndicator size="small" color={theme.onPrimary} />
-                            : <Text style={styles.saveBtnText}>Save</Text>
-                        }
-                    </Pressable>
+                        loading={isUpdating}
+                    />
                 }
                 chip={<CurrentPatientChip />}
             />
@@ -406,9 +404,12 @@ export default function GeofenceCreateScreen() {
                 >
                     {isFetchingLocation
                         ? <ActivityIndicator size="small" color={theme.primary} />
-                        : <Text style={styles.locationBtnText}>
-                            📍  Set to Patient's Current Location
-                          </Text>
+                        : <>
+                            <Ionicons name="locate" size={18} color={theme.primary} />
+                            <Text style={styles.locationBtnText}>
+                                Set to Patient&apos;s Current Location
+                            </Text>
+                          </>
                     }
                 </Pressable>
 
@@ -454,22 +455,6 @@ export default function GeofenceCreateScreen() {
 // ─────────────────────────────────────────────────────────────────
 function createStyles(theme: Theme) {
     return StyleSheet.create({
-        saveBtn: {
-            backgroundColor: theme.primary,
-            paddingHorizontal: 18,
-            paddingVertical: 8,
-            borderRadius: 8,
-            minWidth: 64,
-            alignItems: 'center',
-        },
-        saveBtnDisabled: {
-            backgroundColor: theme.primaryDisabled,
-        },
-        saveBtnText: {
-            color: theme.onPrimary,
-            fontWeight: '700',
-            fontSize: 14,
-        },
 
         // ── Scroll ──────────────────────────────────────────────
         scroll: {
@@ -623,7 +608,10 @@ function createStyles(theme: Theme) {
             borderColor: theme.primary,
             borderRadius: 8,
             paddingVertical: 12,
+            flexDirection: 'row',
             alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
             marginBottom: 4,
             backgroundColor: theme.primaryMuted,
         },

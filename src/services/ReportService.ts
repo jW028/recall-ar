@@ -107,7 +107,7 @@ function buildHtml(patient: Patient, dataset: AnalyticsDataset): string {
     <div class="meta">Period ${dataset.rangeStart} to ${dataset.rangeEnd} · Generated ${new Date().toISOString().slice(0, 10)}</div>
 
     <div class="flag ${dataset.isDegrading ? 'warn' : 'ok'}">
-        ${dataset.isDegrading ? '⚠ Degradation flagged' : '✓ No degradation flagged'}
+        ${dataset.isDegrading ? 'Degradation flagged' : 'No degradation flagged'}
     </div>
     <p class="summary">${summaryLine(dataset)}</p>
 

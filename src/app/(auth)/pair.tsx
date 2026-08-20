@@ -1,3 +1,4 @@
+import { Button } from '@/components/common/Button';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { PairingService } from '@/services/PairingService';
@@ -73,9 +74,12 @@ export default function PairDeviceScreen() {
           RecallAR needs camera access to scan the setup QR code from the
           caregiver's phone.
         </Text>
-        <Pressable style={styles.button} onPress={requestPermission}>
-          <Text style={styles.buttonText}>Allow camera access</Text>
-        </Pressable>
+        <Button
+          label="Allow camera access"
+          icon="camera-outline"
+          onPress={requestPermission}
+          style={styles.allowButton}
+        />
       </View>
     );
   }
@@ -293,18 +297,8 @@ function createStyles(theme: Theme) {
       fontWeight: '600',
       color: theme.primaryText,
     },
-    button: {
-      backgroundColor: theme.primary,
-      borderRadius: 10,
-      paddingVertical: 16,
-      paddingHorizontal: 24,
-      alignItems: 'center',
+    allowButton: {
       marginTop: 24,
-    },
-    buttonText: {
-      color: theme.onPrimary,
-      fontSize: 16,
-      fontWeight: '600',
     },
   });
 }
