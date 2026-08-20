@@ -1,4 +1,5 @@
 import { CurrentPatientChip } from '@/components/caregiver/CurrentPatientChip';
+import { Button } from '@/components/common/Button';
 import { EmptyState as SharedEmptyState } from '@/components/common/EmptyState';
 import { Screen } from '@/components/common/Screen';
 import { ScreenHeader } from '@/components/common/ScreenHeader';
@@ -8,7 +9,6 @@ import { isPerson } from '@/models/MemoryAsset';
 import type { MemoryAsset } from '@/models/MemoryAsset';
 import { useCurrentPatientId } from '@/store/currentPatientStore';
 import { useMemoryAssetListViewModel } from '@/viewmodels/useMemoryAssetViewModel';
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image } from 'react-native';
 import { useEffect, useMemo } from 'react';
@@ -167,12 +167,7 @@ export default function AssetListScreen() {
             <ScreenHeader
                 title="Memories"
                 chip={<CurrentPatientChip />}
-                right={
-                    <Pressable style={styles.addButton} onPress={goToNew} hitSlop={6}>
-                        <Ionicons name="add" size={20} color={theme.onPrimary} />
-                        <Text style={styles.addButtonText}>Add</Text>
-                    </Pressable>
-                }
+                right={<Button label="Add" icon="add" size="sm" onPress={goToNew} />}
             />
 
             <FilterToggle value={typeFilter} onChange={setTypeFilter} styles={styles} />
@@ -212,20 +207,6 @@ function createStyles(theme: Theme) {
             justifyContent: 'center',
             alignItems: 'center',
             backgroundColor: theme.surface,
-        },
-        addButton: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 4,
-            backgroundColor: theme.primary,
-            borderRadius: 12,
-            paddingHorizontal: 14,
-            paddingVertical: 9,
-        },
-        addButtonText: {
-            color: theme.onPrimary,
-            fontSize: 15,
-            fontWeight: '600',
         },
         filterRow: {
             flexDirection: 'row',

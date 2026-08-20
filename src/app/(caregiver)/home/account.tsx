@@ -1,4 +1,5 @@
 import { ActionRow } from '@/components/caregiver/ActionRow';
+import { Avatar } from '@/components/common/Avatar';
 import { Button } from '@/components/common/Button';
 import { Screen } from '@/components/common/Screen';
 import { ScreenHeader } from '@/components/common/ScreenHeader';
@@ -21,8 +22,6 @@ export default function AccountScreen() {
     const mode = useThemeStore((s) => s.mode);
     const setMode = useThemeStore((s) => s.setMode);
 
-    const initial = (user?.fullName || user?.email || '?').charAt(0).toUpperCase();
-
     const handleSignOut = async () => {
         await AuthService.signOut();
         clearAuth();
@@ -33,14 +32,29 @@ export default function AccountScreen() {
             <ScreenHeader title="Account" showBack />
             <ScrollView contentContainerStyle={styles.content}>
                 <View style={styles.profileCard}>
-                    <View style={styles.avatar}>
-                        <Text style={styles.avatarText}>{initial}</Text>
-                    </View>
+                    <Avatar
+                        imageUrl={user?.imageUrl}
+                        name={user?.fullName || user?.email || '?'}
+                        size={60}
+                    />
                     <View style={styles.profileInfo}>
                         <Text style={styles.name}>{user?.fullName || 'Caregiver'}</Text>
                         <Text style={styles.email}>{user?.email}</Text>
+                        {!!user?.contact && <Text style={styles.contact}>{user.contact}</Text>}
                     </View>
                 </View>
+
+                <Text style={styles.sectionLabel}>Profile</Text>
+                <ActionRow
+                    icon="person-outline"
+                    label="Edit profile"
+                    onPress={() => router.push('/(caregiver)/home/edit-profile')}
+                />
+                <ActionRow
+                    icon="lock-closed-outline"
+                    label="Change password"
+                    onPress={() => router.push('/(caregiver)/home/change-password')}
+                />
 
                 <Text style={styles.sectionLabel}>Appearance</Text>
                 <View style={styles.card}>
@@ -95,19 +109,6 @@ function createStyles(theme: Theme) {
             borderColor: theme.border,
             padding: 20,
         },
-        avatar: {
-            width: 60,
-            height: 60,
-            borderRadius: 30,
-            backgroundColor: theme.primarySoft,
-            alignItems: 'center',
-            justifyContent: 'center',
-        },
-        avatarText: {
-            fontSize: 24,
-            fontWeight: '700',
-            color: theme.primary,
-        },
         profileInfo: {
             flex: 1,
         },
@@ -120,6 +121,11 @@ function createStyles(theme: Theme) {
         email: {
             fontSize: 14,
             color: theme.textMuted,
+        },
+        contact: {
+            fontSize: 14,
+            color: theme.textMuted,
+            marginTop: 2,
         },
         sectionLabel: {
             fontSize: 13,

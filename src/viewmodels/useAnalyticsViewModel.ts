@@ -3,6 +3,8 @@ import type { Patient } from '@/models/Patient';
 import { AnalyticsService } from '@/services/AnalyticsService';
 import { PatientService } from '@/services/PatientService';
 import { ReportService } from '@/services/ReportService';
+import type { RefreshOptions } from '@/viewmodels/useMemoryAssetViewModel';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 type AnalyticsStatus = 'loading' | 'ready' | 'empty' | 'error';
@@ -13,7 +15,7 @@ interface UseAnalyticsViewModel {
     dataset: AnalyticsDataset | null;
     timeframe: AnalyticsTimeframe;
     setTimeframe: (timeframe: AnalyticsTimeframe) => void;
-    refresh: () => Promise<void>;
+    refresh: (opts?: RefreshOptions) => Promise<void>;
     // Pull-to-refresh reloads without flipping status to 'loading', so the dashboard stays visible under the spinner
     isRefreshing: boolean;
     isExporting: boolean;
@@ -42,16 +44,22 @@ export function useAnalyticsViewModel(patientId: string | undefined): UseAnalyti
         };
     }, []);
 
+    // 'initial' shows the full-screen loading state, 'manual' shows the pull spinner, 'quiet' shows nothing —
+    // the last is for focus reloads, which the user did not ask for and should not see.
+    type LoadMode = 'initial' | 'manual' | 'quiet';
+
+    const quietInFlightRef = useRef<Promise<void> | null>(null);
+
     const load = useCallback(
-        async (tf: AnalyticsTimeframe, silent = false) => {
+        async (tf: AnalyticsTimeframe, mode: LoadMode = 'initial') => {
             if (!patientId) {
                 setError('Patient not found.');
                 setStatus('error');
                 return;
             }
-            // Silent reloads keep the current dataset on screen; only the pull spinner signals activity
-            if (silent) setIsRefreshing(true);
-            else setStatus('loading');
+            // Non-initial reloads keep the current dataset on screen; only the pull spinner signals activity
+            if (mode === 'manual') setIsRefreshing(true);
+            else if (mode === 'initial') setStatus('loading');
             setError(null);
 
             // Patient (name + DOB) is needed for the exported report header
@@ -65,12 +73,12 @@ export function useAnalyticsViewModel(patientId: string | undefined): UseAnalyti
             if (result.error || !result.data) {
                 setError(result.error ?? 'Failed to load analytics.');
                 setStatus('error');
-                if (silent) setIsRefreshing(false);
+                if (mode === 'manual') setIsRefreshing(false);
                 return;
             }
             setDataset(result.data);
             setStatus(result.data.hasData ? 'ready' : 'empty');
-            if (silent) setIsRefreshing(false);
+            if (mode === 'manual') setIsRefreshing(false);
         },
         [patientId]
     );
@@ -83,7 +91,28 @@ export function useAnalyticsViewModel(patientId: string | undefined): UseAnalyti
         setTimeframeState(tf);
     }, []);
 
-    const refresh = useCallback(() => load(timeframe, true), [load, timeframe]);
+    const refresh = useCallback(
+        (opts?: RefreshOptions): Promise<void> => {
+            if (!opts?.silent) return load(timeframe, 'manual');
+            // Generating analytics is an expensive aggregation, so collapse a focus reload onto one already
+            // running rather than starting a second pass over the same rows.
+            if (quietInFlightRef.current) return quietInFlightRef.current;
+            const run = load(timeframe, 'quiet').finally(() => {
+                quietInFlightRef.current = null;
+            });
+            quietInFlightRef.current = run;
+            return run;
+        },
+        [load, timeframe]
+    );
+
+    // Home and the Training analytics tab both stay mounted, so without this the accuracy and latency
+    // figures stay frozen at whatever they were when the screen first appeared.
+    useFocusEffect(
+        useCallback(() => {
+            refresh({ silent: true });
+        }, [refresh])
+    );
 
     const exportReport = useCallback(async () => {
         if (!dataset || !dataset.hasData || !patientRef.current) return;

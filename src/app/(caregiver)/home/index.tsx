@@ -16,7 +16,7 @@ import { useMemoryAssetListViewModel } from '@/viewmodels/useMemoryAssetViewMode
 import { usePatientListViewModel } from '@/viewmodels/usePatientViewModel';
 import { useThreatListViewModel } from '@/viewmodels/useThreatViewModel';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -72,8 +72,15 @@ export default function CaregiverHomeScreen() {
     );
 
     const { assets, refresh, isLoading: isLoadingAssets } = useMemoryAssetListViewModel(currentPatient?.patientId);
-    const { dataset, exportReport, isExporting, exportMessage, exportError, clearExportMessage } =
-        useAnalyticsViewModel(currentPatient?.patientId);
+    const {
+        dataset,
+        refresh: refreshAnalytics,
+        exportReport,
+        isExporting,
+        exportMessage,
+        exportError,
+        clearExportMessage,
+    } = useAnalyticsViewModel(currentPatient?.patientId);
 
     const { threats, refresh: refreshThreats } = useThreatListViewModel(currentPatient?.patientId);
 
@@ -102,20 +109,16 @@ export default function CaregiverHomeScreen() {
             await Promise.all([
                 refresh(),
                 refreshThreats(),
-                refreshPatients()
+                refreshPatients(),
+                refreshAnalytics()
             ]);
         } finally {
             setIsRefreshing(false);
         }
-    }, [refresh, refreshThreats, refreshPatients]);
+    }, [refresh, refreshThreats, refreshPatients, refreshAnalytics]);
 
-    // Re-fetch counts when returning to this screen (e.g. after enrolling a memory) since the home stays mounted
-    useFocusEffect(
-        useCallback(() => {
-            refresh();
-            refreshThreats();
-        }, [refresh, refreshThreats])
-    );
+    // Returning to this screen is handled by the focus effect inside each viewmodel, so there is no
+    // screen-level focus refresh here — one would just fire every fetch a second time.
 
     const peopleCount = assets.filter(isPerson).length;
     const objectCount = assets.filter(isObject).length;

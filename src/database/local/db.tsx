@@ -15,12 +15,13 @@ import { MIGRATION_V6_UPDATE_THREAT } from './migrations/v6_update_threat';
 import { MIGRATION_V7_ASSET_PAUSE } from './migrations/v7_asset_pause';
 import { MIGRATION_V8_EMBEDDING_MODEL } from './migrations/v8_embedding_model';
 import { MIGRATION_V9_RECOGNITION_EVENT } from './migrations/v9_recognition_event';
+import { MIGRATION_V14_CAREGIVER_PROFILE_PICTURE } from './migrations/v14_caregiver_profile_picture';
 import { CREATE_TABLES } from './schema';
 
 const DATABASE_NAME = 'recallar.db';
 
 // Bump this number when a new migration is added in the MIGRATIONS array
-const LATEST_VERSION = 13;
+const LATEST_VERSION = 14;
 
 
 interface Migration {
@@ -94,6 +95,11 @@ const MIGRATIONS: Migration[] = [
         version: 13,
         description: 'Add ctxAlert_desc and ctxAlert_type columns to ContextAlert',
         sql: MIGRATION_V13_CONTEXT_ALERT_FIELDS,
+    },
+    {
+        version: 14,
+        description: 'Add image_url profile picture column to Caregiver',
+        sql: MIGRATION_V14_CAREGIVER_PROFILE_PICTURE,
     },
 ];
 

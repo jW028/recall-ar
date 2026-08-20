@@ -9,7 +9,14 @@ import {
     type CreatePersonParams,
     type UpdateMemoryAssetParams,
 } from '@/services/MemoryAssetService';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+// Options accepted by a list viewmodel's refresh. silent skips the loading flag so a focus-triggered
+// reload doesn't spin the screen's pull-to-refresh indicator.
+export interface RefreshOptions {
+    silent?: boolean;
+}
 
 // Runs the on-device embedding model for the given asset type over the photos and returns the averaged embedding.
 // People use the face model; objects use a general image-feature model — a face model cannot embed objects.
@@ -43,7 +50,7 @@ interface UseMemoryAssetListViewModel {
     filteredAssets: MemoryAsset[];
     isLoading: boolean;
     error: string | null;
-    refresh: () => Promise<void>;
+    refresh: (opts?: RefreshOptions) => Promise<void>;
     typeFilter: TypeFilter;
     setTypeFilter: (filter: TypeFilter) => void;
     // Active pool count (Onboarding + Maintenance); paused assets excluded, matching the cap rule.
@@ -62,22 +69,40 @@ export function useMemoryAssetListViewModel(
     const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
     const [pendingId, setPendingId] = useState<string | null>(null);
 
-    const refresh = useCallback(async () => {
-        if (!patientId) return;
-        setIsLoading(true);
+    const inFlightRef = useRef<Promise<void> | null>(null);
+
+    const refresh = useCallback((opts?: RefreshOptions): Promise<void> => {
+        if (!patientId) return Promise.resolve();
+        // Only silent (focus) reloads join an in-flight run. An explicit refresh always executes, so a
+        // reload issued right after a mutation is never collapsed into a run that started before it.
+        if (opts?.silent && inFlightRef.current) return inFlightRef.current;
+
+        if (!opts?.silent) setIsLoading(true);
         setError(null);
-        const result = await MemoryAssetService.getAssetsByPatient(patientId);
-        if (result.error) {
-            setError(result.error);
-        } else {
-            setAssets(result.data ?? []);
-        }
-        setIsLoading(false);
+
+        const run = (async () => {
+            const result = await MemoryAssetService.getAssetsByPatient(patientId);
+            if (result.error) {
+                setError(result.error);
+            } else {
+                setAssets(result.data ?? []);
+            }
+            setIsLoading(false);
+        })().finally(() => {
+            inFlightRef.current = null;
+        });
+
+        inFlightRef.current = run;
+        return run;
     }, [patientId]);
 
-    useEffect(() => {
-        refresh();
-    }, [refresh]);
+    // The list screen stays mounted under its stack, so focus is the only signal that an edit made on a
+    // pushed screen (or on another tab holding its own copy of this viewmodel) needs picking up.
+    useFocusEffect(
+        useCallback(() => {
+            refresh({ silent: true });
+        }, [refresh])
+    );
 
     const pause = useCallback(async (assetId: string): Promise<boolean> => {
         setPendingId(assetId);

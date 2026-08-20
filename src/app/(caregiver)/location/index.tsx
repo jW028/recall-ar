@@ -1,9 +1,11 @@
 import { CurrentPatientChip } from '@/components/caregiver/CurrentPatientChip';
+import { Button } from '@/components/common/Button';
 import { ScreenHeader } from '@/components/common/ScreenHeader';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useCurrentPatientId } from '@/store/currentPatientStore';
 import { useGeofenceListViewModel, usePatientGeofenceEventsViewModel, usePatientLocationViewModel } from '@/viewmodels/useGeofenceViewModels';
+import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -102,7 +104,7 @@ export default function GeofenceListScreen() {
                     latitude: location.latitude,
                     longitude: location.longitude,
                     isLive,
-                    label: isLive ? '📍 Patient (Live)' : '📍 Last Known Area',
+                    label: isLive ? 'Patient (Live)' : 'Last Known Area',
                     recordedAt: location.recordedAt,
                     locationName,
                 });
@@ -122,7 +124,7 @@ export default function GeofenceListScreen() {
                         latitude: lat,
                         longitude: lon,
                         isLive: false,
-                        label: `📍 Last seen near ${lastEvent.geofence.geofenceType}`,
+                        label: `Last seen near ${lastEvent.geofence.geofenceType}`,
                     });
                 } else {
                     Alert.alert(
@@ -213,7 +215,7 @@ export default function GeofenceListScreen() {
                         latitude: location.latitude,
                         longitude: location.longitude,
                         isLive,
-                        label: isLive ? '📍 Patient (Live)' : '📍 Last Known Area',
+                        label: isLive ? 'Patient (Live)' : 'Last Known Area',
                         recordedAt: location.recordedAt,
                         locationName,
                     });
@@ -292,9 +294,12 @@ export default function GeofenceListScreen() {
             <ScreenHeader
                 title="Location Tracking"
                 right={
-                    <Pressable onPress={() => setIsSettingsOpen(true)} style={styles.headerButton}>
-                        <Text style={{ fontSize: 16, fontWeight: '600', color: theme.primary }}>Edit</Text>
-                    </Pressable>
+                    <Button
+                        label="Edit"
+                        variant="ghost"
+                        size="sm"
+                        onPress={() => setIsSettingsOpen(true)}
+                    />
                 }
                 chip={<CurrentPatientChip />}
             />
@@ -383,9 +388,11 @@ export default function GeofenceListScreen() {
                     {events.map((e, index) => (
                         <View key={e.event.geoEventId || index} style={styles.historyCard}>
                             <View style={styles.historyIconContainer}>
-                                <Text style={styles.historyEmoji}>
-                                    {e.event.eventType === 'Enter' ? '🏠' : '🚪'}
-                                </Text>
+                                <Ionicons
+                                    name={e.event.eventType === 'Enter' ? 'enter-outline' : 'exit-outline'}
+                                    size={22}
+                                    color={e.event.eventType === 'Enter' ? theme.success : theme.warning}
+                                />
                             </View>
                             <View style={styles.historyContent}>
                                 <Text style={styles.historyTitle}>
@@ -436,7 +443,7 @@ export default function GeofenceListScreen() {
 
                         {geofences.length === 0 && (
                             <View style={styles.emptyState}>
-                                <Text style={styles.emptyIcon}>📍</Text>
+                                <Ionicons name="location-outline" size={40} color={theme.textFaint} style={styles.emptyIcon} />
                                 <Text style={styles.emptyTitle}>No geofences yet</Text>
                                 <Text style={styles.emptySubtitle}>
                                     Add a safe zone to start tracking boundary events.
@@ -470,7 +477,7 @@ export default function GeofenceListScreen() {
                                     style={styles.deleteIcon}
                                     onPress={() => handleDelete(geofence.geofenceId, geofence.geofenceType)}
                                 >
-                                    <Text style={styles.deleteIconText}>🗑</Text>
+                                    <Ionicons name="trash-outline" size={20} color={theme.error} />
                                 </Pressable>
                             </Pressable>
                         ))}
@@ -491,9 +498,6 @@ function createStyles(theme: Theme) {
             flex: 1,
             justifyContent: 'center',
             alignItems: 'center',
-        },
-        headerButton: {
-            padding: 8,
         },
         content: {
             padding: 20,
@@ -586,13 +590,10 @@ function createStyles(theme: Theme) {
             width: 48,
             height: 48,
             borderRadius: 24,
-            backgroundColor: '#F1F5F9',
+            backgroundColor: theme.backgroundElement,
             justifyContent: 'center',
             alignItems: 'center',
             marginRight: 16,
-        },
-        historyEmoji: {
-            fontSize: 20,
         },
         historyContent: {
             flex: 1,
@@ -671,7 +672,6 @@ function createStyles(theme: Theme) {
             paddingVertical: 48,
         },
         emptyIcon: {
-            fontSize: 48,
             marginBottom: 12,
         },
         emptyTitle: {
@@ -729,9 +729,6 @@ function createStyles(theme: Theme) {
         },
         deleteIcon: {
             padding: 8,
-        },
-        deleteIconText: {
-            fontSize: 18,
         },
     });
 }

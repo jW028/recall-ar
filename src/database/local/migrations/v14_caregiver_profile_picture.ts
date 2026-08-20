@@ -1,0 +1,3 @@
+export const MIGRATION_V14_CAREGIVER_PROFILE_PICTURE = `
+  ALTER TABLE Caregiver ADD COLUMN image_url TEXT;
+`;

@@ -1,4 +1,5 @@
 import { AvatarPicker } from '@/components/caregiver/AvatarPicker';
+import { Button } from '@/components/common/Button';
 import { FormField } from '@/components/common/FormField';
 import { Screen } from '@/components/common/Screen';
 import { ScreenHeader } from '@/components/common/ScreenHeader';
@@ -13,7 +14,6 @@ import { useMemo, useState } from 'react';
 import {
     KeyboardAvoidingView,
     Platform,
-    Pressable,
     ScrollView,
     StyleSheet,
     Text,
@@ -176,19 +176,20 @@ export default function NewPatientScreen() {
                     />
                 </View>
 
-                <Pressable
-                    style={[styles.button, !isFormValid && styles.buttonDisabled]}
+                <Button
+                    label={isUploading ? 'Uploading photo…' : isCreating ? 'Saving…' : 'Save patient'}
                     onPress={handleSubmit}
-                    disabled={!isFormValid || isCreating || isUploading}
-                >
-                    <Text style={styles.buttonText}>
-                        {isUploading ? 'Uploading photo…' : isCreating ? 'Saving…' : 'Save patient'}
-                    </Text>
-                </Pressable>
+                    disabled={!isFormValid}
+                    loading={isCreating || isUploading}
+                    style={styles.submit}
+                />
 
-                <Pressable style={styles.cancelButton} onPress={() => router.back()}>
-                    <Text style={styles.cancelButtonText}>Cancel</Text>
-                </Pressable>
+                <Button
+                    label="Cancel"
+                    variant="outline"
+                    onPress={() => router.back()}
+                    style={styles.cancel}
+                />
             </ScrollView>
             </KeyboardAvoidingView>
         </Screen>
@@ -222,16 +223,7 @@ function createStyles(theme: Theme) {
             backgroundColor: theme.cardBackground,
         },
         textArea: { minHeight: 100 },
-        button: {
-            backgroundColor: theme.primary,
-            borderRadius: 10,
-            paddingVertical: 16,
-            alignItems: 'center',
-            marginTop: 8,
-        },
-        buttonDisabled: { backgroundColor: theme.primaryDisabled },
-        buttonText: { color: theme.onPrimary, fontSize: 16, fontWeight: '600' },
-        cancelButton: { paddingVertical: 16, alignItems: 'center', marginTop: 4 },
-        cancelButtonText: { color: theme.textMuted, fontSize: 15, fontWeight: '600' },
+        submit: { marginTop: 8 },
+        cancel: { marginTop: 10 },
     });
 }

@@ -1,14 +1,10 @@
+import { ENCOURAGEMENT_PRESETS } from '@/constants/encouragementPresets';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useEncouragementViewModel } from '@/viewmodels/useEncouragementViewModel';
+import { Ionicons } from '@expo/vector-icons';
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-
-const PRESETS: { emoji: string; message: string }[] = [
-    { emoji: '❤️', message: 'Great job!' },
-    { emoji: '⭐', message: 'So proud of you!' },
-    { emoji: '🌟', message: 'Keep it up!' },
-];
 
 // Caregiver panel: the patient's engagement at a glance plus one-tap encouragements.
 export function EncouragementPanel({ patientId }: { patientId: string }) {
@@ -53,14 +49,14 @@ export function EncouragementPanel({ patientId }: { patientId: string }) {
                 </Text>
             )}
             <View style={styles.presetRow}>
-                {PRESETS.map((preset) => (
+                {ENCOURAGEMENT_PRESETS.map((preset) => (
                     <Pressable
-                        key={preset.emoji}
+                        key={preset.icon}
                         style={[styles.presetButton, disabled && styles.presetDisabled]}
                         disabled={disabled}
-                        onPress={() => send(preset.message, preset.emoji)}
+                        onPress={() => send(preset.message, preset.icon)}
                     >
-                        <Text style={styles.presetEmoji}>{preset.emoji}</Text>
+                        <Ionicons name={preset.icon} size={20} color={theme.primaryText} />
                         <Text style={styles.presetLabel}>{preset.message}</Text>
                     </Pressable>
                 ))}
@@ -144,9 +140,6 @@ function createStyles(theme: Theme) {
         },
         presetDisabled: {
             opacity: 0.5,
-        },
-        presetEmoji: {
-            fontSize: 20,
         },
         presetLabel: {
             fontSize: 12,

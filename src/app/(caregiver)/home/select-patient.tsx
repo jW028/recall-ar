@@ -111,12 +111,7 @@ export default function PatientListScreen() {
       <ScreenHeader
         title="Select patient"
         showBack
-        right={
-          <Pressable style={styles.addButton} onPress={goToNewPatient} hitSlop={6}>
-            <Ionicons name="add" size={20} color={theme.onPrimary} />
-            <Text style={styles.addButtonText}>Add</Text>
-          </Pressable>
-        }
+        right={<Button label="Add" icon="add" size="sm" onPress={goToNewPatient} />}
       />
 
       {error && (
@@ -161,20 +156,6 @@ function createStyles(theme: Theme) {
       justifyContent: 'center',
       alignItems: 'center',
       backgroundColor: theme.surface,
-    },
-    addButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      backgroundColor: theme.primary,
-      borderRadius: 12,
-      paddingHorizontal: 14,
-      paddingVertical: 9,
-    },
-    addButtonText: {
-      color: theme.onPrimary,
-      fontSize: 15,
-      fontWeight: '600',
     },
     errorBox: {
       backgroundColor: theme.errorBackground,

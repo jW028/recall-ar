@@ -8,6 +8,7 @@ import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { validate } from '@/utils/validation';
+import { Button } from '@/components/common/Button';
 import { FormField } from '@/components/common/FormField';
 import { Screen } from '@/components/common/Screen';
 import { ScreenHeader } from '@/components/common/ScreenHeader';
@@ -307,17 +308,21 @@ export default function NewAssetScreen() {
                     </>
                 )}
 
-                <Pressable
-                    style={[styles.submitButton, !canPress && styles.submitButtonDisabled]}
+                <Button
+                    label={submitLabel}
                     onPress={handleSubmit}
                     disabled={!canPress}
-                >
-                    <Text style={styles.submitButtonText}>{submitLabel}</Text>
-                </Pressable>
+                    loading={isProcessing}
+                    style={styles.submit}
+                />
 
-                <Pressable style={styles.cancelButton} onPress={() => router.back()} disabled={isProcessing}>
-                    <Text style={styles.cancelButtonText}>Cancel</Text>
-                </Pressable>
+                <Button
+                    label="Cancel"
+                    variant="outline"
+                    onPress={() => router.back()}
+                    disabled={isProcessing}
+                    style={styles.cancel}
+                />
             </ScrollView>
             </KeyboardAvoidingView>
         </Screen>
@@ -427,16 +432,7 @@ function createStyles(theme: Theme) {
             backgroundColor: theme.cardBackground,
         },
         textArea: { minHeight: 80 },
-        submitButton: {
-            backgroundColor: theme.primary,
-            borderRadius: 10,
-            paddingVertical: 16,
-            alignItems: 'center',
-            marginTop: 8,
-        },
-        submitButtonDisabled: { backgroundColor: theme.primaryDisabled },
-        submitButtonText: { color: theme.onPrimary, fontSize: 16, fontWeight: '600' },
-        cancelButton: { paddingVertical: 16, alignItems: 'center', marginTop: 4 },
-        cancelButtonText: { color: theme.textMuted, fontSize: 15, fontWeight: '600' },
+        submit: { marginTop: 8 },
+        cancel: { marginTop: 10 },
     });
 }

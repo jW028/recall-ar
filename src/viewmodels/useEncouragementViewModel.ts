@@ -1,3 +1,4 @@
+import type { EncouragementIcon } from '@/constants/encouragementPresets';
 import { AnalyticsService, type EngagementSnapshot } from '@/services/AnalyticsService';
 import { EncouragementService } from '@/services/EncouragementService';
 import { useAuthStore } from '@/store/authStore';
@@ -12,7 +13,7 @@ interface UseEncouragementViewModel {
     isCoolingDown: boolean;
     sentConfirmation: string | null;
     error: string | null;
-    send: (message: string, emoji: string) => Promise<void>;
+    send: (message: string, icon: EncouragementIcon) => Promise<void>;
 }
 
 // Caregiver half of the encouragement feature: engagement snapshot + one-tap sends.
@@ -36,18 +37,19 @@ export function useEncouragementViewModel(patientId: string): UseEncouragementVi
     }, [patientId]);
 
     const send = useCallback(
-        async (message: string, emoji: string) => {
+        async (message: string, icon: EncouragementIcon) => {
             if (!caregiverId || isSending || isCoolingDown) return;
             setIsSending(true);
             setError(null);
-            const result = await EncouragementService.send({ patientId, caregiverId, message, emoji });
+            // The service field stays `emoji` — it is the column name, which now holds an icon name.
+            const result = await EncouragementService.send({ patientId, caregiverId, message, emoji: icon });
             if (!mountedRef.current) return;
             setIsSending(false);
             if (result.error) {
                 setError(result.error);
                 return;
             }
-            setSentConfirmation(`Sent ${emoji} — it'll appear on their home screen.`);
+            setSentConfirmation("Sent! It'll appear on their home screen.");
             setIsCoolingDown(true);
             setTimeout(() => {
                 if (mountedRef.current) {
