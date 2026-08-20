@@ -153,8 +153,6 @@ export const CREATE_TABLES = `
         patient_id        TEXT NOT NULL,
         asset_id          TEXT,                            -- nullable (alert may not relate to an asset)
         ctxAlert_msg      TEXT NOT NULL,
-        ctxAlert_desc     TEXT,                            -- nullable description
-        ctxAlert_type     TEXT NOT NULL DEFAULT 'Reminder',-- Reminder, Medication, Safety, Object
         ctxAlert_status   TEXT NOT NULL,
         ctxAlert_time     TEXT NOT NULL DEFAULT (datetime('now')), -- [5] NOT NULL
         ack_time          TEXT,                            -- nullable — may not be acknowledged
