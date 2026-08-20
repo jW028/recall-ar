@@ -2,9 +2,10 @@ import { Button } from '@/components/common/Button';
 import type { Theme } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useARViewModel } from '@/viewmodels/useARViewModel';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Camera } from 'react-native-vision-camera';
 
@@ -24,6 +25,8 @@ export default function ARViewScreen() {
         photoOutput,
         isCameraActive,
         onCameraError,
+        contextReminders,
+        acknowledgeReminder,
     } = useARViewModel();
 
     // Screen is already inset above the tab bar; small gap is enough
@@ -79,6 +82,42 @@ export default function ARViewScreen() {
                 <View style={[styles.errorOverlay, { bottom: overlayBottom }]}>
                     <Text style={styles.errorText}>{initError}</Text>
                     <Button label="Go back" variant="secondary" onPress={() => router.replace('/(patient)')} />
+                </View>
+            )}
+
+            {/* Contextual Reminder Overlay */}
+            {ready && contextReminders.length > 0 && (
+                <View style={[styles.reminderBannerContainer, { top: insets.top + 16 }]}>
+                    {contextReminders.map((reminder) => {
+                        const typeIcon =
+                            reminder.ctxAlertType === 'Medication'
+                                ? 'medkit'
+                                : reminder.ctxAlertType === 'Safety'
+                                ? 'shield-checkmark'
+                                : reminder.ctxAlertType === 'Object'
+                                ? 'cube'
+                                : 'notifications';
+                        return (
+                            <View key={reminder.ctxAlertId} style={styles.reminderBanner}>
+                                <View style={styles.reminderBannerHeader}>
+                                    <Ionicons name={typeIcon} size={20} color="#FFFFFF" />
+                                    <Text style={styles.reminderBannerTitle}>
+                                        {reminder.ctxAlertType || 'Contextual'} Reminder
+                                    </Text>
+                                </View>
+                                <Text style={styles.reminderBannerMsg}>{reminder.ctxAlertMsg}</Text>
+                                {reminder.ctxAlertDesc ? (
+                                    <Text style={styles.reminderBannerDesc}>{reminder.ctxAlertDesc}</Text>
+                                ) : null}
+                                <Pressable
+                                    style={styles.reminderAckBtn}
+                                    onPress={() => acknowledgeReminder(reminder.ctxAlertId)}
+                                >
+                                    <Text style={styles.reminderAckBtnText}>Acknowledge</Text>
+                                </Pressable>
+                            </View>
+                        );
+                    })}
                 </View>
             )}
 
@@ -228,6 +267,60 @@ function createStyles(theme: Theme) {
             color: 'rgba(255,255,255,0.85)',
             fontSize: 15,
             fontWeight: '500',
+        },
+        reminderBannerContainer: {
+            position: 'absolute',
+            left: 20,
+            right: 20,
+            zIndex: 100,
+            gap: 10,
+        },
+        reminderBanner: {
+            backgroundColor: 'rgba(37, 99, 235, 0.92)',
+            borderRadius: 16,
+            padding: 16,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 6,
+            elevation: 6,
+        },
+        reminderBannerHeader: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            marginBottom: 6,
+        },
+        reminderBannerTitle: {
+            color: '#FFFFFF',
+            fontSize: 15,
+            fontWeight: '800',
+            letterSpacing: 0.3,
+        },
+        reminderBannerMsg: {
+            color: '#F8FAFC',
+            fontSize: 16,
+            fontWeight: '700',
+            lineHeight: 22,
+            marginBottom: 4,
+        },
+        reminderBannerDesc: {
+            color: 'rgba(255,255,255,0.85)',
+            fontSize: 13,
+            lineHeight: 18,
+            marginBottom: 12,
+        },
+        reminderAckBtn: {
+            backgroundColor: '#FFFFFF',
+            paddingVertical: 8,
+            paddingHorizontal: 16,
+            borderRadius: 8,
+            alignSelf: 'flex-end',
+        },
+        reminderAckBtnText: {
+            color: '#2563EB',
+            fontWeight: '800',
+            fontSize: 13,
         },
     });
 }

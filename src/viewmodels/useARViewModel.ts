@@ -1,4 +1,6 @@
 import { AR_LATENCY_BUDGET_MS } from '@/constants/config';
+import type { ContextAlert } from '@/models/ContextAlert';
+import { ContextAlertService } from '@/services/ContextAlertService';
 import { EngagementService } from '@/services/EngagementService';
 import { PairingService } from '@/services/PairingService';
 import { RecognitionService, type RecognitionResult } from '@/services/RecognitionService';
@@ -28,6 +30,8 @@ export interface ARViewModelResult {
     // False while a dead camera session is being restarted
     isCameraActive: boolean;
     onCameraError: (error: Error) => void;
+    contextReminders: ContextAlert[];
+    acknowledgeReminder: (alertId: string) => Promise<void>;
 }
 
 export function useARViewModel(): ARViewModelResult {
@@ -108,6 +112,13 @@ export function useARViewModel(): ARViewModelResult {
         }, CAMERA_RECOVERY_DELAY_MS);
     }, []);
 
+    const [contextReminders, setContextReminders] = useState<ContextAlert[]>([]);
+
+    const acknowledgeReminder = useCallback(async (alertId: string) => {
+        await ContextAlertService.acknowledgeContextAlert(alertId);
+        setContextReminders((prev) => prev.filter((a) => a.ctxAlertId !== alertId));
+    }, []);
+
     const capture = useCallback(async () => {
         if (!isReadyRef.current || isProcessingRef.current) return;
         isProcessingRef.current = true;
@@ -122,6 +133,17 @@ export function useARViewModel(): ARViewModelResult {
 
             if (isMountedRef.current) {
                 setResult(recognitionResult);
+            }
+
+            // Evaluate contextual reminders if patient is paired
+            const pId = pairedPatientIdRef.current || patientId;
+            if (pId) {
+                const detectedAssetId =
+                    recognitionResult.status === 'recognized' ? recognitionResult.assetId : null;
+                const evalRes = await ContextAlertService.evaluateContextAlerts(pId, detectedAssetId);
+                if (isMountedRef.current && evalRes.data) {
+                    setContextReminders(evalRes.data);
+                }
             }
 
             // Fire-and-forget engagement log; day-level de-dupe lives in the service. Never touches SRT scheduling.
@@ -140,7 +162,7 @@ export function useARViewModel(): ARViewModelResult {
         } finally {
             isProcessingRef.current = false;
         }
-    }, [photoOutput]);
+    }, [photoOutput, patientId]);
 
     useEffect(() => {
         // Don't capture into a session that is stopped or being restarted
@@ -160,5 +182,7 @@ export function useARViewModel(): ARViewModelResult {
         photoOutput,
         isCameraActive,
         onCameraError,
+        contextReminders,
+        acknowledgeReminder,
     };
 }

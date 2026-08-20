@@ -79,7 +79,6 @@ export default function GeofenceCreateScreen() {
     const [longitude, setLongitude] = useState('');
     const [radius, setRadius] = useState('');
     const [zoneType, setZoneType] = useState('Home');
-    const [typePickerOpen, setTypePickerOpen] = useState(false);
 
     // ── Location search state ─────────────────────────────────────
     const [locationQuery, setLocationQuery] = useState('');
@@ -200,6 +199,10 @@ export default function GeofenceCreateScreen() {
             Alert.alert('Validation', 'Please enter a valid radius greater than 0.');
             return;
         }
+        if (!zoneType.trim()) {
+            Alert.alert('Validation', 'Please enter a safe zone type or label.');
+            return;
+        }
         if (!patientId) {
              Alert.alert('Error', 'Patient ID is missing.');
              return;
@@ -210,7 +213,7 @@ export default function GeofenceCreateScreen() {
             centerLatitude: mapLat,
             centerLongitude: mapLon,
             radiusMeters: mapRadius,
-            geofenceType: zoneType,
+            geofenceType: zoneType.trim(),
         });
         
         if (ok) {
@@ -430,43 +433,17 @@ export default function GeofenceCreateScreen() {
                 <Text style={[styles.sectionTitle, { marginTop: 24 }]}>
                     Safe Zone Type
                 </Text>
-                <Pressable
-                    style={styles.typeSelector}
-                    onPress={() => setTypePickerOpen(o => !o)}
-                >
-                    <Text style={styles.typeSelectorText}>{zoneType}</Text>
-                    <Text style={styles.typeSelectorChevron}>
-                        {typePickerOpen ? '▲' : '▼'}
-                    </Text>
-                </Pressable>
-                {typePickerOpen && (
-                    <View style={styles.typeDropdown}>
-                        {ZONE_TYPES.map(t => (
-                            <Pressable
-                                key={t}
-                                style={({ pressed }) => [
-                                    styles.typeOption,
-                                    t === zoneType && styles.typeOptionSelected,
-                                    pressed && styles.typeOptionPressed,
-                                ]}
-                                onPress={() => {
-                                    setZoneType(t);
-                                    setTypePickerOpen(false);
-                                }}
-                            >
-                                <Text style={[
-                                    styles.typeOptionText,
-                                    t === zoneType && styles.typeOptionTextSelected,
-                                ]}>
-                                    {t}
-                                </Text>
-                                {t === zoneType && (
-                                    <Text style={styles.typeOptionCheck}>✓</Text>
-                                )}
-                            </Pressable>
-                        ))}
-                    </View>
-                )}
+                <TextInput
+                    id="create-geofence-type"
+                    style={styles.input}
+                    value={zoneType}
+                    onChangeText={setZoneType}
+                    placeholder="e.g. Home, Park, Daycare, Grandma's House"
+                    placeholderTextColor={theme.textFaint}
+                />
+                <Text style={styles.helperText}>
+                    Enter a custom label or name for this safe zone.
+                </Text>
 
                 <View style={{ height: 40 }} />
             </ScrollView>

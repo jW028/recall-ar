@@ -9,11 +9,12 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "node tests/register.mjs tests/trainingService.test.ts && node tests/register.mjs tests/poolCap.test.ts && node tests/register.mjs tests/sessionFlow.test.ts && node tests/register.mjs tests/onboardingSimulation.test.ts"
+    "test": "npx tsx tests/fallDetectionService.test.ts && npx tsx tests/contextAlertService.test.ts && npx tsx tests/geofenceService.test.ts"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/datetimepicker": "8.4.4",
     "@react-native-community/netinfo": "11.4.1",
     "@react-native-google-signin/google-signin": "^16.1.2",
     "@react-navigation/bottom-tabs": "^7.15.5",
@@ -40,6 +41,7 @@
     "expo-print": "~15.0.8",
     "expo-router": "~6.0.24",
     "expo-secure-store": "~15.0.8",
+    "expo-sensors": "~15.0.8",
     "expo-sharing": "~14.0.8",
     "expo-splash-screen": "~31.0.13",
     "expo-sqlite": "~16.0.10",

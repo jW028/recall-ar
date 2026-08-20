@@ -3,6 +3,10 @@
 import { SQLiteProvider, useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
 import { Suspense, useEffect, type ReactNode } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { MIGRATION_V10_ENCOURAGEMENT } from './migrations/v10_encouragement';
+import { MIGRATION_V11_PATIENT_PROFILE_PICTURE } from './migrations/v11_patient_profile_picture';
+import { MIGRATION_V12_SYNC_STATE_SCOPE } from './migrations/v12_sync_state_scope';
+import { MIGRATION_V13_CONTEXT_ALERT_FIELDS } from './migrations/v13_context_alert_fields';
 import { MIGRATION_V2_DEVICE_PAIRING } from './migrations/v2_device_pairing';
 import { MIGRATION_V3_ASSET_PHOTO_POOL } from './migrations/v3_asset_photo_pool';
 import { MIGRATION_V4_SYNC_STATE } from './migrations/v4_sync_state';
@@ -11,15 +15,12 @@ import { MIGRATION_V6_UPDATE_THREAT } from './migrations/v6_update_threat';
 import { MIGRATION_V7_ASSET_PAUSE } from './migrations/v7_asset_pause';
 import { MIGRATION_V8_EMBEDDING_MODEL } from './migrations/v8_embedding_model';
 import { MIGRATION_V9_RECOGNITION_EVENT } from './migrations/v9_recognition_event';
-import { MIGRATION_V10_ENCOURAGEMENT } from './migrations/v10_encouragement';
-import { MIGRATION_V11_PATIENT_PROFILE_PICTURE } from './migrations/v11_patient_profile_picture';
-import { MIGRATION_V12_SYNC_STATE_SCOPE } from './migrations/v12_sync_state_scope';
 import { CREATE_TABLES } from './schema';
 
 const DATABASE_NAME = 'recallar.db';
 
 // Bump this number when a new migration is added in the MIGRATIONS array
-const LATEST_VERSION = 12;
+const LATEST_VERSION = 13;
 
 
 interface Migration {
@@ -89,7 +90,12 @@ const MIGRATIONS: Migration[] = [
         description: 'Key SyncState watermarks by pull scope',
         sql: MIGRATION_V12_SYNC_STATE_SCOPE,
     },
-]
+    {
+        version: 13,
+        description: 'Add ctxAlert_desc and ctxAlert_type columns to ContextAlert',
+        sql: MIGRATION_V13_CONTEXT_ALERT_FIELDS,
+    },
+];
 
 // Migration runner, called by SQLiteProvider's onInit
 async function runMigrations(db: SQLiteDatabase): Promise<void> {
@@ -140,6 +146,17 @@ async function ensureColumns(db: SQLiteDatabase): Promise<void> {
     if (!patientCols.some((c) => c.name === 'image_url')) {
         console.log('[DB] Backfilling missing column Patient.image_url');
         await db.execAsync(`ALTER TABLE Patient ADD COLUMN image_url TEXT;`);
+    }
+
+    // ctxAlert_desc and ctxAlert_type are added in v12; backfill on DBs that reached v12 before it was wired in.
+    const alertCols = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(ContextAlert)`);
+    if (!alertCols.some((c) => c.name === 'ctxAlert_desc')) {
+        console.log('[DB] Backfilling missing column ContextAlert.ctxAlert_desc');
+        await db.execAsync(`ALTER TABLE ContextAlert ADD COLUMN ctxAlert_desc TEXT;`);
+    }
+    if (!alertCols.some((c) => c.name === 'ctxAlert_type')) {
+        console.log('[DB] Backfilling missing column ContextAlert.ctxAlert_type');
+        await db.execAsync(`ALTER TABLE ContextAlert ADD COLUMN ctxAlert_type TEXT NOT NULL DEFAULT 'Reminder';`);
     }
 }
 

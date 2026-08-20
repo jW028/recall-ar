@@ -82,9 +82,51 @@ async function getPushTokenForCaregiver(caregiverId: string): Promise<string | n
     return token ?? null;
 }
 
-// Sends an emergency push notification to the caregiver via Expo Push API
-async function sendEmergencyNotification(pushToken: string): Promise<void> {
-    console.log('[NotificationService] Sending push notification to token:', pushToken);
+// Triggers an immediate local system notification (banner & sound) on the device
+async function sendLocalEmergencyNotification(
+    alertType: 'Panic Button' | 'Fall Detected' = 'Fall Detected'
+): Promise<void> {
+    const title = alertType === 'Fall Detected' ? '🚨 Fall Detected Alert!' : '🚨 Emergency Alert!';
+    const body = alertType === 'Fall Detected'
+        ? 'A fall was detected! Emergency alert dispatched to caregiver.'
+        : 'Your SOS emergency alert has been broadcasted!';
+
+    try {
+        await Notifications.scheduleNotificationAsync({
+            content: {
+                title,
+                body,
+                sound: 'default',
+                priority: Notifications.AndroidNotificationPriority.MAX,
+            },
+            trigger: null,
+        });
+        console.log('[NotificationService] Local emergency notification scheduled successfully.');
+    } catch (e) {
+        console.error('[NotificationService] Failed to send local emergency notification:', e);
+    }
+}
+
+// Sends an emergency push notification to the caregiver via Expo Push API + local notification
+async function sendEmergencyNotification(
+    pushToken: string | null,
+    alertType: 'Panic Button' | 'Fall Detected' = 'Panic Button'
+): Promise<void> {
+    // 1. Always trigger local notification as immediate feedback
+    await sendLocalEmergencyNotification(alertType);
+
+    // 2. If push token is present, send remote push notification to caregiver
+    if (!pushToken) {
+        console.warn('[NotificationService] No push token provided for remote caregiver notification');
+        return;
+    }
+
+    console.log('[NotificationService] Sending push notification to token:', pushToken, 'type:', alertType);
+    const title = alertType === 'Fall Detected' ? '🚨 Fall Detected Alert!' : '🚨 Emergency Alert!';
+    const body = alertType === 'Fall Detected'
+        ? 'A fall was detected for your patient! Open the app to view location and respond.'
+        : 'Your patient has triggered the SOS panic button. Open the app to respond.';
+
     try {
         const response = await fetch('https://exp.host/--/api/v2/push/send', {
             method: 'POST',
@@ -92,8 +134,8 @@ async function sendEmergencyNotification(pushToken: string): Promise<void> {
             body: JSON.stringify({
                 to: pushToken,
                 channelId: 'emergency-alerts',
-                title: '🚨 Emergency Alert!',
-                body: 'Your patient has triggered the SOS panic button. Open the app to respond.',
+                title,
+                body,
                 sound: 'default',
                 priority: 'high',
                 data: { url: '/(caregiver)/alerts' },
@@ -167,7 +209,10 @@ export const NotificationService = {
     registerForPushNotifications,
     savePushTokenForCaregiver,
     getPushTokenForCaregiver,
+    sendLocalEmergencyNotification,
     sendEmergencyNotification,
     scheduleDailyReviewReminder,
     cancelDailyReviewReminder,
 };
+
+

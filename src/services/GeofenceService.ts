@@ -293,6 +293,64 @@ async function pullGeofencesFromCloud(
     return {data: count, error: null}
 }
 
+function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371e3; // Earth radius in meters
+    const p1 = (lat1 * Math.PI) / 180;
+    const p2 = (lat2 * Math.PI) / 180;
+    const dp = ((lat2 - lat1) * Math.PI) / 180;
+    const dl = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+        Math.sin(dp / 2) * Math.sin(dp / 2) +
+        Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) * Math.sin(dl / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
+/**
+ * Evaluates patient's current location against all geofences for that patient.
+ * Records 'Enter' or 'Exit' events if boundary transitions occurred since the last recorded event.
+ */
+async function evaluatePatientLocationAndRecordEvents(
+    patientId: string,
+    latitude: number,
+    longitude: number
+): Promise<ServiceResult<{ event: GeofenceEvent; geofence: Geofence }[]>> {
+    const { data: geofences, error: geoError } = await getGeofencesByPatient(patientId);
+    if (geoError || !geofences || geofences.length === 0) {
+        return { data: [], error: null };
+    }
+
+    const newEvents: { event: GeofenceEvent; geofence: Geofence }[] = [];
+
+    for (const fence of geofences) {
+        const dist = getDistanceInMeters(latitude, longitude, fence.centerLatitude, fence.centerLongitude);
+        const isInside = dist <= fence.radiusMeters;
+
+        const { data: recentEvents } = await getEventsByGeofence(fence.geofenceId);
+        const lastEvent = recentEvents && recentEvents.length > 0 ? recentEvents[0] : null;
+
+        if (isInside) {
+            // Patient is inside fence. Record Enter if last event was Exit or no event recorded yet.
+            if (!lastEvent || lastEvent.eventType === 'Exit') {
+                const res = await recordGeofenceEvent(fence.geofenceId, 'Enter');
+                if (res.data) {
+                    newEvents.push({ event: res.data, geofence: fence });
+                }
+            }
+        } else {
+            // Patient is outside fence. Record Exit if last event was Enter.
+            if (lastEvent && lastEvent.eventType === 'Enter') {
+                const res = await recordGeofenceEvent(fence.geofenceId, 'Exit');
+                if (res.data) {
+                    newEvents.push({ event: res.data, geofence: fence });
+                }
+            }
+        }
+    }
+
+    return { data: newEvents, error: null };
+}
+
 export const GeofenceService = {
     createGeofence,
     getGeofenceById,
@@ -303,4 +361,5 @@ export const GeofenceService = {
     getEventsByGeofence,
     getEventsByPatient,
     pullGeofencesFromCloud,
+    evaluatePatientLocationAndRecordEvents,
 };

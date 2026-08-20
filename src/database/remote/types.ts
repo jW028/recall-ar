@@ -77,6 +77,8 @@ export type Database = {
           asset_id: string | null
           ctxalert_id: string
           ctxalert_msg: string
+          ctxalert_desc: string | null
+          ctxalert_type: string | null
           ctxalert_status: string
           ctxalert_time: string
           frequency: string
@@ -88,6 +90,8 @@ export type Database = {
           asset_id?: string | null
           ctxalert_id?: string
           ctxalert_msg: string
+          ctxalert_desc?: string | null
+          ctxalert_type?: string | null
           ctxalert_status: string
           ctxalert_time?: string
           frequency: string
@@ -99,6 +103,8 @@ export type Database = {
           asset_id?: string | null
           ctxalert_id?: string
           ctxalert_msg?: string
+          ctxalert_desc?: string | null
+          ctxalert_type?: string | null
           ctxalert_status?: string
           ctxalert_time?: string
           frequency?: string

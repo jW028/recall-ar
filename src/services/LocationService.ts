@@ -1,4 +1,5 @@
 import { supabase } from '@/database/remote/supabaseClient';
+import { GeofenceService } from '@/services/GeofenceService';
 
 export interface PatientLocationData {
     latitude: number;
@@ -32,6 +33,17 @@ async function publishLocation(
         return { data: null, error: error.message };
     }
 
+    // Evaluate geofence enter/exit transitions
+    try {
+        await GeofenceService.evaluatePatientLocationAndRecordEvents(
+            patientId,
+            coords.latitude,
+            coords.longitude
+        );
+    } catch (e) {
+        console.warn('[LocationService] Failed to evaluate geofence transitions:', e);
+    }
+
     return { data: null, error: null };
 }
 
@@ -56,6 +68,17 @@ async function fetchLatestLocation(
 
     if (!data) {
         return { data: null, error: null }; // No location yet — not an error
+    }
+
+    // Evaluate geofence enter/exit transitions for fetched location
+    try {
+        await GeofenceService.evaluatePatientLocationAndRecordEvents(
+            patientId,
+            data.latitude,
+            data.longitude
+        );
+    } catch (e) {
+        console.warn('[LocationService] Failed to evaluate geofence transitions:', e);
     }
 
     return {
