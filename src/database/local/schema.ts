@@ -7,7 +7,6 @@ export const CREATE_TABLES = `
         full_name       TEXT NOT NULL,
         email           TEXT NOT NULL UNIQUE,
         caregiver_contact TEXT NOT NULL,
-        image_url       TEXT,                              -- nullable, public URL in the caregiver-avatars bucket
         created_at      TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
     );
