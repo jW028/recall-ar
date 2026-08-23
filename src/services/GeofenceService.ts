@@ -3,6 +3,7 @@ import { supabase } from '@/database/remote/supabaseClient';
 import type { Geofence } from '@/models/Geofence';
 import type { GeofenceEvent } from '@/models/GeofenceEvent';
 import * as Crypto from 'expo-crypto';
+import { SyncService } from './SyncService';
 
 export interface ServiceResult<T = void> {
     data: T | null;
@@ -91,6 +92,7 @@ async function createGeofence(
     }
 
     await queueSync('Geofence', geofenceId, 'INSERT');
+    await SyncService.drainQueue().catch(() => {});
     
     const geofence: Geofence = {
         geofenceId,
@@ -130,6 +132,7 @@ async function deleteGeofence(geofenceId: string): Promise<ServiceResult> {
     }
 
     await queueSync('Geofence', geofenceId, 'DELETE');
+    await SyncService.drainQueue().catch(() => {});
     return { data: null, error: null };
 }
 
@@ -178,6 +181,7 @@ async function updateGeofence(
     }
 
     await queueSync('Geofence', geofenceId, 'UPDATE');
+    await SyncService.drainQueue().catch(() => {});
 
     // Re-fetch to return the up-to-date row
     return getGeofenceById(geofenceId);
@@ -263,10 +267,34 @@ async function pullGeofencesFromCloud(
     }
 
     const db = getDatabase();
+
+    // Check SyncLog for any unsynced local pending operations
+    const pendingLogs = await db.getAllAsync<{ row_id: string; operation: string }>(
+        `SELECT row_id, operation FROM SyncLog WHERE table_name = 'Geofence' AND synced = 0`
+    );
+    const pendingDeleteIds = new Set(
+        pendingLogs.filter(l => l.operation === 'DELETE').map(l => l.row_id)
+    );
+    const pendingUpsertIds = new Set(
+        pendingLogs.filter(l => l.operation === 'INSERT' || l.operation === 'UPDATE').map(l => l.row_id)
+    );
+
+    const remoteGeofenceIds = new Set<string>();
     let count = 0;
 
     await db.withExclusiveTransactionAsync(async () => {
         for (const row of rows ?? []) {
+            remoteGeofenceIds.add(row.geofence_id);
+
+            // Skip resurrecting geofences that were deleted locally but not yet pushed to cloud
+            if (pendingDeleteIds.has(row.geofence_id)) {
+                continue;
+            }
+            // Skip overwriting local changes if there's an unsynced local edit
+            if (pendingUpsertIds.has(row.geofence_id)) {
+                continue;
+            }
+
             // ON CONFLICT DO UPDATE, never INSERT OR REPLACE: the latter deletes and reinserts the row, which would cascade away child GeofenceEvent rows once foreign keys are enforced.
             await db.runAsync(
                 `INSERT INTO Geofence (geofence_id, patient_id, center_latitude, center_longitude, radius_meters, geofence_type)
@@ -288,9 +316,21 @@ async function pullGeofencesFromCloud(
             );
             count++;
         }
-    })
 
-    return {data: count, error: null}
+        // Clean up local geofences for this patient that no longer exist remotely and are not pending local creation/update
+        const localRows = await db.getAllAsync<{ geofence_id: string }>(
+            `SELECT geofence_id FROM Geofence WHERE patient_id = ?`,
+            [patientId]
+        );
+
+        for (const localRow of localRows) {
+            if (!remoteGeofenceIds.has(localRow.geofence_id) && !pendingUpsertIds.has(localRow.geofence_id)) {
+                await db.runAsync(`DELETE FROM Geofence WHERE geofence_id = ?`, [localRow.geofence_id]);
+            }
+        }
+    });
+
+    return { data: count, error: null };
 }
 
 function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {

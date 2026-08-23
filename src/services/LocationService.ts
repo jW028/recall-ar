@@ -13,6 +13,12 @@ export interface ServiceResult<T = void> {
     error: string | null;
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isValidUUID(uuid: string): boolean {
+    return typeof uuid === 'string' && UUID_REGEX.test(uuid);
+}
+
 /**
  * Publishes the patient's current GPS coordinates to Supabase.
  * Called periodically by the patient device while the app is open.
@@ -21,6 +27,10 @@ async function publishLocation(
     patientId: string,
     coords: { latitude: number; longitude: number; accuracy: number | null }
 ): Promise<ServiceResult> {
+    if (!isValidUUID(patientId)) {
+        return { data: null, error: 'Invalid patient ID format.' };
+    }
+
     const { error } = await supabase.from('PatientLocation').insert({
         patient_id: patientId,
         latitude: coords.latitude,
@@ -54,6 +64,10 @@ async function publishLocation(
 async function fetchLatestLocation(
     patientId: string
 ): Promise<ServiceResult<PatientLocationData>> {
+    if (!isValidUUID(patientId)) {
+        return { data: null, error: 'Invalid patient ID format.' };
+    }
+
     const { data, error } = await supabase
         .from('PatientLocation')
         .select('latitude, longitude, accuracy, recorded_at')
@@ -97,6 +111,8 @@ async function fetchLatestLocation(
  * Optionally called after publishing to avoid table bloat.
  */
 async function pruneOldLocations(patientId: string): Promise<void> {
+    if (!isValidUUID(patientId)) return;
+
     // Fetch the 11th oldest location_id (to keep the 10 newest)
     const { data } = await supabase
         .from('PatientLocation')
