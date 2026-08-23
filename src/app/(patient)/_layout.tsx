@@ -1,7 +1,9 @@
 import { AppTabBar } from '@/components/common/AppTabBar';
 import { FallAlertModal } from '@/components/patient/FallAlertModal';
+import { WanderingAlertModal } from '@/components/patient/WanderingAlertModal';
 import { ThemeSchemeContext } from '@/hooks/use-theme';
 import { useFallDetectionViewModel } from '@/viewmodels/useFallDetectionViewModel';
+import { useWanderingViewModel } from '@/viewmodels/useWanderingViewModel';
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { useEffect } from 'react';
@@ -11,19 +13,35 @@ import { useEffect } from 'react';
 export default function PatientLayout() {
     const {
         fallState,
-        countdownSeconds,
-        enableMonitoring,
-        disableMonitoring,
+        countdownSeconds: fallCountdownSeconds,
+        enableMonitoring: enableFallMonitoring,
+        disableMonitoring: disableFallMonitoring,
         cancelFallAlert,
-        triggerImmediateSOS,
+        triggerImmediateSOS: triggerImmediateFallSOS,
     } = useFallDetectionViewModel();
 
+    const {
+        wanderingState,
+        countdownSeconds: wanderingCountdownSeconds,
+        enableWanderingMonitoring,
+        disableWanderingMonitoring,
+        confirmPatientOK,
+        triggerImmediateWanderingSOS,
+    } = useWanderingViewModel();
+
     useEffect(() => {
-        enableMonitoring();
+        enableFallMonitoring();
+        enableWanderingMonitoring();
         return () => {
-            disableMonitoring();
+            disableFallMonitoring();
+            disableWanderingMonitoring();
         };
-    }, [enableMonitoring, disableMonitoring]);
+    }, [
+        enableFallMonitoring,
+        disableFallMonitoring,
+        enableWanderingMonitoring,
+        disableWanderingMonitoring,
+    ]);
 
     return (
         <ThemeSchemeContext.Provider value="light">
@@ -71,10 +89,18 @@ export default function PatientLayout() {
 
             <FallAlertModal
                 visible={fallState !== 'idle'}
-                countdownSeconds={countdownSeconds}
+                countdownSeconds={fallCountdownSeconds}
                 fallState={fallState}
                 onCancel={cancelFallAlert}
-                onImmediateSOS={triggerImmediateSOS}
+                onImmediateSOS={triggerImmediateFallSOS}
+            />
+
+            <WanderingAlertModal
+                visible={wanderingState !== 'idle'}
+                countdownSeconds={wanderingCountdownSeconds}
+                wanderingState={wanderingState}
+                onCancel={confirmPatientOK}
+                onImmediateSOS={triggerImmediateWanderingSOS}
             />
         </ThemeSchemeContext.Provider>
     );

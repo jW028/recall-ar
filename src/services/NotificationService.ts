@@ -82,14 +82,27 @@ async function getPushTokenForCaregiver(caregiverId: string): Promise<string | n
     return token ?? null;
 }
 
+export type EmergencyAlertType =
+    | 'Panic Button'
+    | 'Fall Detected'
+    | 'Wandering Alert'
+    | 'Wandering Alert: Patient Outside Safe Zone'
+    | (string & {});
+
 // Triggers an immediate local system notification (banner & sound) on the device
 async function sendLocalEmergencyNotification(
-    alertType: 'Panic Button' | 'Fall Detected' = 'Fall Detected'
+    alertType: EmergencyAlertType = 'Panic Button'
 ): Promise<void> {
-    const title = alertType === 'Fall Detected' ? '🚨 Fall Detected Alert!' : '🚨 Emergency Alert!';
-    const body = alertType === 'Fall Detected'
-        ? 'A fall was detected! Emergency alert dispatched to caregiver.'
-        : 'Your SOS emergency alert has been broadcasted!';
+    let title = '🚨 Emergency Alert!';
+    let body = 'Your SOS emergency alert has been broadcasted!';
+
+    if (alertType === 'Fall Detected') {
+        title = '🚨 Fall Detected Alert!';
+        body = 'A fall was detected! Emergency alert dispatched to caregiver.';
+    } else if (alertType.startsWith('Wandering Alert')) {
+        title = '🚨 Wandering Alert!';
+        body = 'Patient detected outside safe zone! Emergency alert dispatched to caregiver.';
+    }
 
     try {
         await Notifications.scheduleNotificationAsync({
@@ -110,7 +123,7 @@ async function sendLocalEmergencyNotification(
 // Sends an emergency push notification to the caregiver via Expo Push API + local notification
 async function sendEmergencyNotification(
     pushToken: string | null,
-    alertType: 'Panic Button' | 'Fall Detected' = 'Panic Button'
+    alertType: EmergencyAlertType = 'Panic Button'
 ): Promise<void> {
     // 1. Always trigger local notification as immediate feedback
     await sendLocalEmergencyNotification(alertType);
@@ -122,10 +135,16 @@ async function sendEmergencyNotification(
     }
 
     console.log('[NotificationService] Sending push notification to token:', pushToken, 'type:', alertType);
-    const title = alertType === 'Fall Detected' ? '🚨 Fall Detected Alert!' : '🚨 Emergency Alert!';
-    const body = alertType === 'Fall Detected'
-        ? 'A fall was detected for your patient! Open the app to view location and respond.'
-        : 'Your patient has triggered the SOS panic button. Open the app to respond.';
+    let title = '🚨 Emergency Alert!';
+    let body = 'Your patient has triggered the SOS panic button. Open the app to respond.';
+
+    if (alertType === 'Fall Detected') {
+        title = '🚨 Fall Detected Alert!';
+        body = 'A fall was detected for your patient! Open the app to view location and respond.';
+    } else if (alertType.startsWith('Wandering Alert')) {
+        title = '🚨 Wandering Alert!';
+        body = 'Patient detected outside safe zone! Open the app to view location and respond.';
+    }
 
     try {
         const response = await fetch('https://exp.host/--/api/v2/push/send', {
