@@ -219,7 +219,7 @@ export default function ContextAlertDetailScreen() {
                     onPress: async () => {
                         const success = await deleteAlert(id);
                         if (success) {
-                            router.back();
+                            handleBack();
                         } else {
                             Alert.alert('Error', 'Failed to delete contextual alert.');
                         }
@@ -227,6 +227,14 @@ export default function ContextAlertDetailScreen() {
                 },
             ]
         );
+    };
+
+    const handleBack = () => {
+        if (router.canGoBack()) {
+            router.back();
+        } else {
+            router.replace('/(caregiver)/context-alerts');
+        }
     };
 
     const filteredObjects = useMemo(() => {
@@ -257,7 +265,7 @@ export default function ContextAlertDetailScreen() {
         return (
             <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
                 <View style={styles.headerBar}>
-                    <Pressable onPress={() => router.back()} style={styles.headerBackBtn} hitSlop={8}>
+                    <Pressable onPress={handleBack} style={styles.headerBackBtn} hitSlop={8}>
                         <Ionicons name="arrow-back" size={24} color={theme.heading} />
                     </Pressable>
                     <Text style={styles.headerTitle}>Reminder Details</Text>
@@ -293,7 +301,7 @@ export default function ContextAlertDetailScreen() {
         <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
             {/* Header Bar */}
             <View style={styles.headerBar}>
-                <Pressable onPress={() => router.back()} style={styles.headerBackBtn} hitSlop={8}>
+                <Pressable onPress={handleBack} style={styles.headerBackBtn} hitSlop={8}>
                     <Ionicons name="arrow-back" size={24} color={theme.heading} />
                 </Pressable>
                 <Text style={styles.headerTitle}>Reminder Details</Text>

@@ -406,7 +406,17 @@ export default function ContextAlertsDashboardScreen() {
         <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
             {/* Header Bar */}
             <View style={styles.headerBar}>
-                <Pressable onPress={() => router.back()} style={styles.headerBackBtn} hitSlop={8}>
+                <Pressable
+                    onPress={() => {
+                        if (router.canGoBack()) {
+                            router.back();
+                        } else {
+                            router.replace('/(caregiver)/home');
+                        }
+                    }}
+                    style={styles.headerBackBtn}
+                    hitSlop={8}
+                >
                     <Ionicons name="arrow-back" size={24} color={theme.heading} />
                 </Pressable>
                 <Text style={styles.headerTitle}>My Contextual Alert</Text>
