@@ -1,56 +1,121 @@
-# Welcome to your Expo app 👋
+# RecallAR
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A mobile memory-assistance app for people living with dementia, and the caregivers who look after
+them. The patient points their phone at a person or object and RecallAR names it; between those
+moments it runs Spaced Retrieval Training so the names stay learnable. Everything the patient does
+becomes signal on a caregiver dashboard — accuracy and response-latency trends, safe-zone
+departures, fall alerts.
 
-## Get started
+Recognition runs entirely on-device (TensorFlow Lite), so the app works without a network. Supabase
+is the remote source of truth; SQLite is the local store, and `SyncService` bridges the two whenever
+connectivity returns.
 
-1. Install dependencies
+## What's in it
 
-   ```bash
-   npm install
-   ```
+**Patient app** — AR recognition of enrolled faces and objects, a daily training session, a photo
+album of their memories, a panic button, and passive fall detection.
 
-2. Start the app
+**Caregiver app** — patient management and device pairing, memory enrollment, training pool
+configuration, cognitive analytics with PDF report export, geofences and location alerts, context
+alerts, and support tickets.
 
-   ```bash
-   npx expo start
-   ```
+**Admin dashboard** (`admin/`) — a separate Vite + React web app for operators. See
+[`admin/README.md`](admin/README.md).
 
-In the output, you'll find options to open the app in a
+## Stack
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- Expo SDK 54 (React Native 0.81, React 19) with Expo Router file-based routing
+- MVVM: screens → `viewmodels/` hooks → `services/` → data. Zustand for global auth/patient state
+- `expo-sqlite` locally, Supabase (Postgres + Storage + Edge Functions) remotely
+- `react-native-vision-camera` + `react-native-fast-tflite` for on-device inference
+  (MobileFaceNet 512-d for faces, MobileNetV2 1280-d for objects)
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Requirements
 
-## Get a fresh project
+- Node 24+ (the test runner needs native TypeScript and `node:sqlite`)
+- Xcode / Android Studio — **Expo Go will not work.** The app depends on native modules that are not
+  in the Expo Go runtime, so you need a development build.
+- A Supabase project
 
-When you're ready, run:
+## Setup
 
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Create `.env` in the project root:
 
-### Other setup steps
+```
+EXPO_PUBLIC_SUPABASE_URL=...
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
+SUPABASE_ACCESS_TOKEN=...          # only needed for CLI/migration work
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+Apply the SQL in `supabase/migrations/`:
 
-## Learn more
+```bash
+npx supabase link --project-ref <your-project-ref>
+npx supabase db push
+npx supabase functions deploy admin-actions
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+These are incremental migrations — RLS policies, admin views, support tables — layered on a base
+schema (`Caregiver`, `Patient`, `MemoryAsset`, and the rest) that was created in the Supabase
+dashboard rather than checked in. On a fresh project, create those tables first to mirror
+`src/database/local/schema.ts`.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Running
 
-## Join the community
+```bash
+npm run ios        # build and launch the dev client on iOS
+npm run android    # same for Android
+npm start          # Metro only, once a dev build is installed
+```
 
-Join our community of developers creating universal apps.
+`android/` and `ios/` are committed, so `expo prebuild` is not part of the normal loop — run it only
+after changing native config in `app.json`.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Tests
+
+```bash
+npm test
+```
+
+Pure-logic and SQL tests for the service layer, run under plain Node against real SQLite with the
+native modules stubbed out — no device or test framework involved. Details and how to add a suite:
+[`tests/README.md`](tests/README.md).
+
+## Layout
+
+```
+src/
+  app/          Expo Router routes, grouped (auth) / (patient) / (caregiver)
+  viewmodels/   one hook per feature domain — the only thing screens call
+  services/     business logic and data access
+  models/       TypeScript shapes shared across layers
+  database/     local/ (SQLite schema + versioned migrations), remote/ (Supabase client)
+  ml/           embedding models, image preprocessing, vector store
+  components/   presentational UI
+  constants/    config.ts holds every tunable threshold
+admin/          operator dashboard (separate app, excluded from the mobile build)
+supabase/       SQL migrations and the admin-actions edge function
+tests/          off-device service tests
+```
+
+Local tables: `Caregiver`, `Patient`, `MemoryAsset`, `TrainingSession`, `DailyReviewEntry`,
+`CognitiveReport`, `Geofence`, `GeofenceEvent`, `Threat`, `ContextAlert`, `SyncLog`. Schema changes
+go in `src/database/local/migrations/` as a new `vN_*.ts` **and** in `supabase/migrations/` — never
+by editing `CREATE_TABLES` in `schema.ts`.
+
+## Design docs
+
+Read these before touching the corresponding area; they override the original spec where they
+disagree with it.
+
+| Doc | Covers |
+|---|---|
+| [`SDD.md`](SDD.md) | System design and the full use-case set |
+| [`TRAINING_FLOW.md`](TRAINING_FLOW.md) | Spaced Retrieval scheduling — elapsed-time, not session timers |
+| [`ANALYTICS.md`](ANALYTICS.md) | Biomarkers, smoothing, trend slopes, the degradation flag |
+| [`PULL_SYNC.md`](PULL_SYNC.md) | Sync direction and conflict handling |
+| [`TESTING.md`](TESTING.md) | Manual test plans and results |
