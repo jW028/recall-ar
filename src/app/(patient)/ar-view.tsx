@@ -93,16 +93,16 @@ export default function ARViewScreen() {
                             reminder.ctxAlertType === 'Medication'
                                 ? 'medkit'
                                 : reminder.ctxAlertType === 'Safety'
-                                ? 'shield-checkmark'
-                                : reminder.ctxAlertType === 'Object'
-                                ? 'cube'
-                                : 'notifications';
+                                    ? 'shield-checkmark'
+                                    : reminder.ctxAlertType === 'Object'
+                                        ? 'cube'
+                                        : 'notifications';
                         return (
                             <View key={reminder.ctxAlertId} style={styles.reminderBanner}>
                                 <View style={styles.reminderBannerHeader}>
                                     <Ionicons name={typeIcon} size={20} color="#FFFFFF" />
                                     <Text style={styles.reminderBannerTitle}>
-                                        {reminder.ctxAlertType || 'Contextual'} Reminder
+                                        Contextual Alert
                                     </Text>
                                 </View>
                                 <Text style={styles.reminderBannerMsg}>{reminder.ctxAlertMsg}</Text>

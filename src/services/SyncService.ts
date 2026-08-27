@@ -100,6 +100,9 @@ async function pushRow(row: SyncLogRow): Promise<string | null> {
 
     try {
         if (row.operation === 'DELETE') {
+            if (row.table_name === 'Geofence') {
+                await supabase.from('GeofenceEvent').delete().eq('geofence_id', row.row_id);
+            }
             const { error } = await supabase
                 .from(config.supabaseTable)
                 .delete()

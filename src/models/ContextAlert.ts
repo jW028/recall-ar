@@ -11,10 +11,10 @@ export interface ContextAlert {
     ctxAlertDesc?: string | null;
     ctxAlertType: ContextAlertType;
     ctxAlertStatus: ContextAlertStatus;
-    ctxAlertTime: string; // Time string e.g. "08:00" or ISO timestamp
+    ctxAlertTime?: string | null; // Time string e.g. "08:00", ISO timestamp, or null for anytime
     ackTime?: string | null;
     ackStatus: ContextAlertAckStatus;
-    frequency: ContextAlertFrequency;
+    frequency?: ContextAlertFrequency | null;
     createdAt?: string;
     updatedAt?: string;
 }
@@ -25,17 +25,17 @@ export interface CreateContextAlertParams {
     ctxAlertMsg: string;
     ctxAlertDesc?: string | null;
     ctxAlertType?: ContextAlertType;
-    ctxAlertTime: string;
-    frequency?: ContextAlertFrequency;
+    ctxAlertTime?: string | null;
+    frequency?: ContextAlertFrequency | null;
 }
 
 export interface UpdateContextAlertParams {
     ctxAlertMsg?: string;
     ctxAlertDesc?: string | null;
     ctxAlertType?: ContextAlertType;
-    ctxAlertTime?: string;
+    ctxAlertTime?: string | null;
     assetId?: string | null;
-    frequency?: ContextAlertFrequency;
+    frequency?: ContextAlertFrequency | null;
     ctxAlertStatus?: ContextAlertStatus;
     ackStatus?: ContextAlertAckStatus;
     ackTime?: string | null;
@@ -44,8 +44,8 @@ export interface UpdateContextAlertParams {
 /**
  * Formats a time string (HH:mm) or ISO date-time string into a user-friendly display string.
  */
-export function formatDisplayDateTime(timeStr: string): string {
-    if (!timeStr) return '';
+export function formatDisplayDateTime(timeStr?: string | null): string {
+    if (!timeStr) return 'Anytime';
 
     const timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
     if (timeMatch) {
@@ -79,9 +79,10 @@ export function formatDisplayDateTime(timeStr: string): string {
 
 /**
  * Checks if a given target time (HH:mm or ISO/date-time string) matches current time within window.
+ * Returns true if targetTimeStr is null or undefined (matches anytime).
  */
-export function isTimeMatching(targetTimeStr: string, now: Date = new Date(), windowMinutes: number = 30): boolean {
-    if (!targetTimeStr) return false;
+export function isTimeMatching(targetTimeStr?: string | null, now: Date = new Date(), windowMinutes: number = 30): boolean {
+    if (!targetTimeStr) return true;
 
     // Handle "HH:mm" or "HH:mm:ss" format
     const timeMatch = targetTimeStr.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
@@ -132,7 +133,7 @@ export function isTimeMatching(targetTimeStr: string, now: Date = new Date(), wi
 /**
  * Checks if a reminder's scheduled time has passed and it has not been acknowledged.
  */
-export function checkIsAlertExpired(targetTimeStr: string, ackStatus?: string, now: Date = new Date()): boolean {
+export function checkIsAlertExpired(targetTimeStr?: string | null, ackStatus?: string | null, now: Date = new Date()): boolean {
     if (ackStatus === 'Acknowledged') return false;
     if (!targetTimeStr) return false;
 

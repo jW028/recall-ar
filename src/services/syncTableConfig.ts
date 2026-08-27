@@ -310,7 +310,7 @@ export const syncTableConfig: Record<SyncableTable, SyncTableConfig> = {
             ctxalert_time: formatToISOTimestamp(row.ctxAlert_time as string),
             ack_time: row.ack_time ?? null,
             ack_status: row.ack_status,
-            frequency: row.frequency,
+            frequency: (row.frequency as string) || 'Once',
         }),
         pull: {
             watermarkColumn: 'ctxalert_time',

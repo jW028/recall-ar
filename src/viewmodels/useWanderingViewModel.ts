@@ -1,29 +1,24 @@
-import { FallDetectionService, type SensitivityLevel } from '@/services/FallDetectionService';
 import { PairingService } from '@/services/PairingService';
+import { WanderingDetectionService, WANDERING_CONFIG } from '@/services/WanderingDetectionService';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-export type FallState = 'idle' | 'countdown' | 'triggered';
+export type WanderingState = 'idle' | 'countdown' | 'triggered';
 
-const INITIAL_COUNTDOWN_SECONDS = 15;
-
-export interface UseFallDetectionViewModel {
+export interface UseWanderingViewModel {
     isMonitoring: boolean;
-    fallState: FallState;
+    wanderingState: WanderingState;
     countdownSeconds: number;
-    sensitivity: SensitivityLevel;
-    setSensitivity: (level: SensitivityLevel) => void;
-    enableMonitoring: () => void;
-    disableMonitoring: () => void;
-    cancelFallAlert: () => void;
-    triggerImmediateSOS: () => Promise<void>;
+    enableWanderingMonitoring: () => void;
+    disableWanderingMonitoring: () => void;
+    confirmPatientOK: () => void;
+    triggerImmediateWanderingSOS: () => Promise<void>;
 }
 
-export function useFallDetectionViewModel(): UseFallDetectionViewModel {
+export function useWanderingViewModel(): UseWanderingViewModel {
     const [isMonitoring, setIsMonitoring] = useState(false);
-    const [fallState, setFallState] = useState<FallState>('idle');
-    const [countdownSeconds, setCountdownSeconds] = useState(INITIAL_COUNTDOWN_SECONDS);
-    const [sensitivity, setSensitivity] = useState<SensitivityLevel>('high');
-    
+    const [wanderingState, setWanderingState] = useState<WanderingState>('idle');
+    const [countdownSeconds, setCountdownSeconds] = useState(WANDERING_CONFIG.countdownDurationSec);
+
     const patientIdRef = useRef<string | null>(null);
     const caregiverIdRef = useRef<string | null>(null);
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -47,30 +42,42 @@ export function useFallDetectionViewModel(): UseFallDetectionViewModel {
         }
     }, []);
 
-    const onPotentialFallDetected = useCallback(() => {
-        setFallState(prev => {
+    const onWanderingPromptTriggered = useCallback(() => {
+        setWanderingState(prev => {
             if (prev !== 'idle') return prev;
             isDispatchingRef.current = false;
-            setCountdownSeconds(INITIAL_COUNTDOWN_SECONDS);
+            setCountdownSeconds(WANDERING_CONFIG.countdownDurationSec);
             return 'countdown';
         });
     }, []);
 
-    const enableMonitoring = useCallback(() => {
-        FallDetectionService.startMonitoring(onPotentialFallDetected, sensitivity);
-        setIsMonitoring(true);
-    }, [onPotentialFallDetected, sensitivity]);
+    const enableWanderingMonitoring = useCallback(async () => {
+        let pId = patientIdRef.current;
+        if (!pId) {
+            const pairing = await PairingService.getPersistedPairing();
+            if (pairing) {
+                pId = pairing.patientId;
+                patientIdRef.current = pId;
+                caregiverIdRef.current = pairing.caregiverId;
+            }
+        }
 
-    const disableMonitoring = useCallback(() => {
-        FallDetectionService.stopMonitoring();
+        const activePatientId = pId || 'default-patient-id';
+        await WanderingDetectionService.startWanderingMonitoring(activePatientId, onWanderingPromptTriggered);
+        setIsMonitoring(true);
+    }, [onWanderingPromptTriggered]);
+
+    const disableWanderingMonitoring = useCallback(() => {
+        WanderingDetectionService.stopWanderingMonitoring();
         setIsMonitoring(false);
     }, []);
 
-    const cancelFallAlert = useCallback(() => {
+    const confirmPatientOK = useCallback(() => {
         clearCountdownTimer();
         isDispatchingRef.current = false;
-        setFallState('idle');
-        setCountdownSeconds(INITIAL_COUNTDOWN_SECONDS);
+        WanderingDetectionService.snoozePromptForInterval();
+        setWanderingState('idle');
+        setCountdownSeconds(WANDERING_CONFIG.countdownDurationSec);
     }, [clearCountdownTimer]);
 
     const dispatchEmergency = useCallback(async () => {
@@ -93,22 +100,22 @@ export function useFallDetectionViewModel(): UseFallDetectionViewModel {
         const finalPatientId = pId || 'default-patient-id';
         const finalCaregiverId = cId || 'default-caregiver-id';
 
-        await FallDetectionService.triggerFallEmergency(finalPatientId, finalCaregiverId);
+        await WanderingDetectionService.triggerWanderingEmergency(finalPatientId, finalCaregiverId);
     }, []);
 
-    const triggerImmediateSOS = useCallback(async () => {
+    const triggerImmediateWanderingSOS = useCallback(async () => {
         clearCountdownTimer();
-        setFallState('triggered');
+        setWanderingState('triggered');
         await dispatchEmergency();
     }, [clearCountdownTimer, dispatchEmergency]);
 
     useEffect(() => {
-        if (fallState === 'countdown') {
+        if (wanderingState === 'countdown') {
             timerRef.current = setInterval(() => {
                 setCountdownSeconds(prev => {
                     if (prev <= 1) {
                         clearCountdownTimer();
-                        setFallState('triggered');
+                        setWanderingState('triggered');
                         setTimeout(() => {
                             dispatchEmergency();
                         }, 0);
@@ -122,17 +129,15 @@ export function useFallDetectionViewModel(): UseFallDetectionViewModel {
         return () => {
             clearCountdownTimer();
         };
-    }, [fallState, clearCountdownTimer, dispatchEmergency]);
+    }, [wanderingState, clearCountdownTimer, dispatchEmergency]);
 
     return {
         isMonitoring,
-        fallState,
+        wanderingState,
         countdownSeconds,
-        sensitivity,
-        setSensitivity,
-        enableMonitoring,
-        disableMonitoring,
-        cancelFallAlert,
-        triggerImmediateSOS,
+        enableWanderingMonitoring,
+        disableWanderingMonitoring,
+        confirmPatientOK,
+        triggerImmediateWanderingSOS,
     };
 }

@@ -1,72 +1,65 @@
-import { Accelerometer, Gyroscope } from 'expo-sensors';
-import * as Location from 'expo-location';
 import { LocationService } from '@/services/LocationService';
-import { ThreatService } from '@/services/ThreatService';
-import { SyncService } from '@/services/SyncService';
 import { NotificationService } from '@/services/NotificationService';
+import { SyncService } from '@/services/SyncService';
+import { ThreatService } from '@/services/ThreatService';
+import * as Location from 'expo-location';
 import type { EventSubscription } from 'expo-modules-core';
+import { Accelerometer, Gyroscope } from 'expo-sensors';
 
-export type SensitivityLevel = 'low' | 'normal' | 'high';
+export type SensitivityLevel = 'low' | 'medium' | 'high';
 
-interface FallDetectionConfig {
-    lowGThreshold: number;
-    highGThreshold: number;
-    extremeImpactThreshold: number;
-    gyroRotationThreshold: number;
-}
-
-const SENSITIVITY_CONFIGS: Record<SensitivityLevel, FallDetectionConfig> = {
-    high: { lowGThreshold: 0.45, highGThreshold: 2.8, extremeImpactThreshold: 4.2, gyroRotationThreshold: 2.5 },
-    normal: { lowGThreshold: 0.35, highGThreshold: 3.5, extremeImpactThreshold: 5.0, gyroRotationThreshold: 3.5 },
-    low: { lowGThreshold: 0.25, highGThreshold: 4.2, extremeImpactThreshold: 6.0, gyroRotationThreshold: 5.0 },
+export const FALL_DETECTION_CONFIG = {
+    impactAccelThresholdMS2: 21.0,
+    gyroRotationThresholdRad: 2.5,
+    orientationTiltThresholdDeg: 60.0,
+    triggerWindowMs: 1500,
 };
 
 let accelSubscription: EventSubscription | null = null;
 let gyroSubscription: EventSubscription | null = null;
-let isFreeFallDetected = false;
-let freeFallTimestamp = 0;
-let isHighRotationDetected = false;
-let highRotationTimestamp = 0;
+
+let lastImpactTimestamp = 0;
+let lastRotationTimestamp = 0;
+let lastTiltTimestamp = 0;
 
 function startMonitoring(
     onFallDetected: () => void,
-    sensitivity: SensitivityLevel = 'high'
+    _sensitivity: SensitivityLevel = 'high'
 ): void {
     if (accelSubscription || gyroSubscription) {
         return;
     }
 
-    const config = SENSITIVITY_CONFIGS[sensitivity];
-
     Accelerometer.setUpdateInterval(100);
     accelSubscription = Accelerometer.addListener(({ x, y, z }) => {
-        const magnitude = Math.sqrt(x * x + y * y + z * z);
+        const magnitudeG = Math.sqrt(x * x + y * y + z * z);
+        const magnitudeMS2 = magnitudeG * 9.80665;
         const now = Date.now();
 
-        // Expire high rotation state if more than 1.5 seconds have elapsed
-        if (isHighRotationDetected && now - highRotationTimestamp > 1500) {
-            isHighRotationDetected = false;
+        // 1. Impact Acceleration Condition
+        if (magnitudeMS2 >= FALL_DETECTION_CONFIG.impactAccelThresholdMS2) {
+            lastImpactTimestamp = now;
         }
 
-        // 1. Detect weightless drop / free-fall phase
-        if (magnitude < config.lowGThreshold) {
-            isFreeFallDetected = true;
-            freeFallTimestamp = now;
-            return;
-        }
-
-        // 2. Expire free-fall state if more than 1.5 seconds have elapsed
-        if (isFreeFallDetected && now - freeFallTimestamp > 1500) {
-            isFreeFallDetected = false;
-        }
-
-        // 3. Impact phase: Require (free-fall drop OR high rotational burst) + impact spike, OR extreme high impact peak
-        if (magnitude > config.highGThreshold) {
-            if (isFreeFallDetected || isHighRotationDetected || magnitude >= config.extremeImpactThreshold) {
-                isFreeFallDetected = false;
-                isHighRotationDetected = false;
-                onFallDetected();
+        // 2. Orientation Tilt Condition (>= 60° tilt relative to vertical Z-axis)
+        if (magnitudeG > 0) {
+            const cosAngle = Math.min(1.0, Math.max(-1.0, Math.abs(z) / magnitudeG));
+            const tiltDeg = Math.acos(cosAngle) * (180 / Math.PI);
+            if (tiltDeg >= FALL_DETECTION_CONFIG.orientationTiltThresholdDeg) {
+                lastTiltTimestamp = now;
             }
+        }
+
+        // 3. Multi-Threshold AND Gate: All 3 conditions must be satisfied within the 1.5s window
+        const isImpactRecent = (now - lastImpactTimestamp) <= FALL_DETECTION_CONFIG.triggerWindowMs && lastImpactTimestamp > 0;
+        const isRotationRecent = (now - lastRotationTimestamp) <= FALL_DETECTION_CONFIG.triggerWindowMs && lastRotationTimestamp > 0;
+        const isTiltRecent = (now - lastTiltTimestamp) <= FALL_DETECTION_CONFIG.triggerWindowMs && lastTiltTimestamp > 0;
+
+        if (isImpactRecent && isRotationRecent && isTiltRecent) {
+            lastImpactTimestamp = 0;
+            lastRotationTimestamp = 0;
+            lastTiltTimestamp = 0;
+            onFallDetected();
         }
     });
 
@@ -80,9 +73,8 @@ function startMonitoring(
             const rotVelocity = Math.sqrt(x * x + y * y + z * z);
             const now = Date.now();
 
-            if (rotVelocity >= config.gyroRotationThreshold) {
-                isHighRotationDetected = true;
-                highRotationTimestamp = now;
+            if (rotVelocity >= FALL_DETECTION_CONFIG.gyroRotationThresholdRad) {
+                lastRotationTimestamp = now;
             }
         });
     }).catch(err => {
@@ -99,8 +91,9 @@ function stopMonitoring(): void {
         gyroSubscription.remove();
         gyroSubscription = null;
     }
-    isFreeFallDetected = false;
-    isHighRotationDetected = false;
+    lastImpactTimestamp = 0;
+    lastRotationTimestamp = 0;
+    lastTiltTimestamp = 0;
 }
 
 function isMonitoring(): boolean {

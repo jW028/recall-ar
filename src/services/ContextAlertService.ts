@@ -50,9 +50,10 @@ async function createContextAlert(
 ): Promise<ServiceResult<ContextAlert>> {
     const db = getDatabase();
     const ctxAlertId = Crypto.randomUUID();
-    const frequency = params.frequency || 'Daily';
+    const frequency = params.frequency ?? null;
     const type = params.ctxAlertType || 'Reminder';
     const desc = params.ctxAlertDesc || null;
+    const time = params.ctxAlertTime ?? null;
     const status = 'Active';
     const ackStatus = 'Unacknowledged';
 
@@ -69,7 +70,7 @@ async function createContextAlert(
                 desc,
                 type,
                 status,
-                params.ctxAlertTime,
+                time,
                 ackStatus,
                 frequency,
             ]
@@ -89,7 +90,7 @@ async function createContextAlert(
         ctxAlertDesc: desc,
         ctxAlertType: type,
         ctxAlertStatus: status,
-        ctxAlertTime: params.ctxAlertTime,
+        ctxAlertTime: time,
         ackTime: null,
         ackStatus,
         frequency,
@@ -111,6 +112,7 @@ async function getContextAlertsForPatient(
         );
         const alerts = rows.map(mapRowToContextAlert);
 
+        // Check each alert to see if it should reset its status for a new day/week
         for (const alert of alerts) {
             if (shouldResetAlertForFrequency(alert, now)) {
                 alert.ackStatus = 'Unacknowledged';
@@ -128,7 +130,7 @@ async function getContextAlertsForPatient(
         return { data: alerts, error: null };
     } catch (e) {
         console.error('[ContextAlertService] Error reading context alerts', e);
-        return { data: null, error: 'Failed to load contextual alerts.' };
+        return { data: [], error: 'Failed to retrieve context alerts.' };
     }
 }
 
@@ -151,9 +153,9 @@ async function updateContextAlert(
         const msg = updates.ctxAlertMsg ?? (existing.ctxAlert_msg as string);
         const desc = updates.ctxAlertDesc !== undefined ? updates.ctxAlertDesc : (existing.ctxAlert_desc as string | null);
         const type = updates.ctxAlertType ?? (existing.ctxAlert_type as ContextAlert['ctxAlertType']) ?? 'Reminder';
-        const time = updates.ctxAlertTime ?? (existing.ctxAlert_time as string);
+        const time = updates.ctxAlertTime !== undefined ? (updates.ctxAlertTime || null) : (existing.ctxAlert_time as string | null);
         const assetId = updates.assetId !== undefined ? (updates.assetId || null) : (existing.asset_id as string | null);
-        const freq = updates.frequency ?? (existing.frequency as ContextAlert['frequency']);
+        const freq = (updates.frequency !== undefined ? updates.frequency : (existing.frequency as ContextAlert['frequency'])) ?? null;
         const status = updates.ctxAlertStatus ?? (existing.ctxAlert_status as ContextAlert['ctxAlertStatus']);
         const ackStatus = updates.ackStatus ?? (existing.ack_status as ContextAlert['ackStatus']);
         const ackTime = updates.ackTime !== undefined ? updates.ackTime : (existing.ack_time as string | null);

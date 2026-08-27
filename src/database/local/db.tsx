@@ -16,12 +16,13 @@ import { MIGRATION_V7_ASSET_PAUSE } from './migrations/v7_asset_pause';
 import { MIGRATION_V8_EMBEDDING_MODEL } from './migrations/v8_embedding_model';
 import { MIGRATION_V9_RECOGNITION_EVENT } from './migrations/v9_recognition_event';
 import { MIGRATION_V14_CAREGIVER_PROFILE_PICTURE } from './migrations/v14_caregiver_profile_picture';
+import { MIGRATION_V15_CONTEXT_ALERT_NULLABLE_SCHEDULE } from './migrations/v15_context_alert_nullable_schedule';
 import { CREATE_TABLES } from './schema';
 
 const DATABASE_NAME = 'recallar.db';
 
 // Bump this number when a new migration is added in the MIGRATIONS array
-const LATEST_VERSION = 14;
+const LATEST_VERSION = 15;
 
 
 interface Migration {
@@ -101,7 +102,84 @@ const MIGRATIONS: Migration[] = [
         description: 'Add image_url profile picture column to Caregiver',
         sql: MIGRATION_V14_CAREGIVER_PROFILE_PICTURE,
     },
+    {
+        version: 15,
+        description: 'Allow nullable ctxAlert_time and frequency in ContextAlert',
+        sql: MIGRATION_V15_CONTEXT_ALERT_NULLABLE_SCHEDULE,
+    },
 ];
+
+async function safeAddColumn(db: SQLiteDatabase, table: string, column: string, columnDef: string): Promise<void> {
+    try {
+        const cols = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);
+        if (!cols.some((c) => c.name.toLowerCase() === column.toLowerCase())) {
+            console.log(`[DB] Adding/backfilling column ${table}.${column}`);
+            await db.execAsync(`ALTER TABLE ${table} ADD COLUMN ${column} ${columnDef};`);
+        }
+    } catch (e: any) {
+        if (typeof e?.message === 'string' && e.message.includes('duplicate column name')) {
+            return;
+        }
+        throw e;
+    }
+}
+
+async function ensureContextAlertNullable(db: SQLiteDatabase): Promise<void> {
+    try {
+        const cols = await db.getAllAsync<{ name: string; notnull: number }>('PRAGMA table_info(ContextAlert)');
+        if (cols.length === 0) return;
+
+        const timeCol = cols.find((c) => c.name.toLowerCase() === 'ctxalert_time');
+        const freqCol = cols.find((c) => c.name.toLowerCase() === 'frequency');
+
+        if (timeCol?.notnull === 1 || freqCol?.notnull === 1) {
+            console.log('[DB] Migrating ContextAlert schema to allow nullable time and frequency');
+            const hasDesc = cols.some((c) => c.name.toLowerCase() === 'ctxalert_desc');
+            const hasType = cols.some((c) => c.name.toLowerCase() === 'ctxalert_type');
+            const descExpr = hasDesc ? 'ctxAlert_desc' : 'NULL';
+            const typeExpr = hasType ? "COALESCE(ctxAlert_type, 'Reminder')" : "'Reminder'";
+
+            await db.execAsync(`
+                CREATE TABLE IF NOT EXISTS ContextAlert_new (
+                    ctxAlert_id       TEXT PRIMARY KEY NOT NULL,
+                    patient_id        TEXT NOT NULL,
+                    asset_id          TEXT,
+                    ctxAlert_msg      TEXT NOT NULL,
+                    ctxAlert_desc     TEXT,
+                    ctxAlert_type     TEXT NOT NULL DEFAULT 'Reminder',
+                    ctxAlert_status   TEXT NOT NULL,
+                    ctxAlert_time     TEXT,
+                    ack_time          TEXT,
+                    ack_status        TEXT NOT NULL,
+                    frequency         TEXT,
+                    FOREIGN KEY (patient_id) REFERENCES Patient(patient_id) ON DELETE CASCADE,
+                    FOREIGN KEY (asset_id)   REFERENCES MemoryAsset(asset_id) ON DELETE SET NULL
+                );
+
+                INSERT OR IGNORE INTO ContextAlert_new
+                    (ctxAlert_id, patient_id, asset_id, ctxAlert_msg, ctxAlert_desc, ctxAlert_type, ctxAlert_status, ctxAlert_time, ack_time, ack_status, frequency)
+                SELECT
+                    ctxAlert_id,
+                    patient_id,
+                    asset_id,
+                    ctxAlert_msg,
+                    ${descExpr},
+                    ${typeExpr},
+                    ctxAlert_status,
+                    ctxAlert_time,
+                    ack_time,
+                    ack_status,
+                    frequency
+                FROM ContextAlert;
+
+                DROP TABLE ContextAlert;
+                ALTER TABLE ContextAlert_new RENAME TO ContextAlert;
+            `);
+        }
+    } catch (e) {
+        console.warn('[DB] Failed to ensure ContextAlert nullable schema:', e);
+    }
+}
 
 // Migration runner, called by SQLiteProvider's onInit
 async function runMigrations(db: SQLiteDatabase): Promise<void> {
@@ -118,7 +196,14 @@ async function runMigrations(db: SQLiteDatabase): Promise<void> {
         for (const migration of MIGRATIONS) {
             if (migration.version > currentVersion) {
                 console.log(`[DB] Running migration v${migration.version}: ${migration.description}`);
-                await db.execAsync(migration.sql);
+                if (migration.version === 13) {
+                    await safeAddColumn(db, 'ContextAlert', 'ctxAlert_desc', 'TEXT');
+                    await safeAddColumn(db, 'ContextAlert', 'ctxAlert_type', "TEXT NOT NULL DEFAULT 'Reminder'");
+                } else if (migration.version === 15) {
+                    await ensureContextAlertNullable(db);
+                } else {
+                    await db.execAsync(migration.sql);
+                }
             }
         }
         await db.execAsync(`PRAGMA user_version = ${LATEST_VERSION}`);
@@ -126,44 +211,37 @@ async function runMigrations(db: SQLiteDatabase): Promise<void> {
     console.log(`[DB] Migration complete. Current schema: v${LATEST_VERSION}`);
 }
 
+// Defensive backfill for column drift: ensures SyncState table has scope_key column regardless of PRAGMA user_version.
+async function ensureSyncStateScope(db: SQLiteDatabase): Promise<void> {
+    try {
+        const cols = await db.getAllAsync<{ name: string }>('PRAGMA table_info(SyncState)');
+        if (cols.length === 0 || !cols.some((c) => c.name.toLowerCase() === 'scope_key')) {
+            console.log('[DB] Upgrading SyncState schema to include scope_key');
+            await db.execAsync(`
+                DROP TABLE IF EXISTS SyncState;
+                CREATE TABLE SyncState (
+                    table_name      TEXT NOT NULL,
+                    scope_key       TEXT NOT NULL DEFAULT '',
+                    last_pulled_at  TEXT NOT NULL DEFAULT '1970-01-01T00:00:00.000Z',
+                    PRIMARY KEY (table_name, scope_key)
+                );
+            `);
+        }
+    } catch (e) {
+        console.warn('[DB] Failed to ensure SyncState scope:', e);
+    }
+}
+
 // Defensive backfill for column drift: some dev DBs reached user_version 5 before the response_latency_ms ALTER was wired into v5, so the migration was skipped and the column is missing. Add it if absent — idempotent and safe on healthy DBs.
 async function ensureColumns(db: SQLiteDatabase): Promise<void> {
-    const cols = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(TrainingSession)`);
-    if (!cols.some((c) => c.name === 'response_latency_ms')) {
-        console.log('[DB] Backfilling missing column TrainingSession.response_latency_ms');
-        await db.execAsync(`ALTER TABLE TrainingSession ADD COLUMN response_latency_ms INTEGER;`);
-    }
-
-    // paused_from is added in v7; backfill the column on DBs that reached v7 before it was wired in.
-    const assetCols = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(MemoryAsset)`);
-    if (!assetCols.some((c) => c.name === 'paused_from')) {
-        console.log('[DB] Backfilling missing column MemoryAsset.paused_from');
-        await db.execAsync(`ALTER TABLE MemoryAsset ADD COLUMN paused_from TEXT;`);
-    }
-
-    // embedding_model is added in v8; backfill on DBs that reached v8 before it was wired in.
-    if (!assetCols.some((c) => c.name === 'embedding_model')) {
-        console.log('[DB] Backfilling missing column MemoryAsset.embedding_model');
-        await db.execAsync(`ALTER TABLE MemoryAsset ADD COLUMN embedding_model TEXT;`);
-    }
-
-    // image_url is added in v11; backfill on DBs that reached v11 before it was wired in.
-    const patientCols = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(Patient)`);
-    if (!patientCols.some((c) => c.name === 'image_url')) {
-        console.log('[DB] Backfilling missing column Patient.image_url');
-        await db.execAsync(`ALTER TABLE Patient ADD COLUMN image_url TEXT;`);
-    }
-
-    // ctxAlert_desc and ctxAlert_type are added in v12; backfill on DBs that reached v12 before it was wired in.
-    const alertCols = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(ContextAlert)`);
-    if (!alertCols.some((c) => c.name === 'ctxAlert_desc')) {
-        console.log('[DB] Backfilling missing column ContextAlert.ctxAlert_desc');
-        await db.execAsync(`ALTER TABLE ContextAlert ADD COLUMN ctxAlert_desc TEXT;`);
-    }
-    if (!alertCols.some((c) => c.name === 'ctxAlert_type')) {
-        console.log('[DB] Backfilling missing column ContextAlert.ctxAlert_type');
-        await db.execAsync(`ALTER TABLE ContextAlert ADD COLUMN ctxAlert_type TEXT NOT NULL DEFAULT 'Reminder';`);
-    }
+    await ensureSyncStateScope(db);
+    await safeAddColumn(db, 'TrainingSession', 'response_latency_ms', 'INTEGER');
+    await safeAddColumn(db, 'MemoryAsset', 'paused_from', 'TEXT');
+    await safeAddColumn(db, 'MemoryAsset', 'embedding_model', 'TEXT');
+    await safeAddColumn(db, 'Patient', 'image_url', 'TEXT');
+    await safeAddColumn(db, 'ContextAlert', 'ctxAlert_desc', 'TEXT');
+    await safeAddColumn(db, 'ContextAlert', 'ctxAlert_type', "TEXT NOT NULL DEFAULT 'Reminder'");
+    await ensureContextAlertNullable(db);
 }
 
 // onInit entry point: run versioned migrations, then reconcile any column drift.
