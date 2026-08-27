@@ -1,5 +1,6 @@
 import { getDatabase, isDatabaseReady } from '@/database/local/db';
 import { supabase } from '@/database/remote/supabaseClient';
+import { AuthService } from '@/services/AuthService';
 import { isOnline, isTransientNetworkError } from '@/utils/connectivity';
 import { syncTableConfig, type SyncableTable } from './syncTableConfig';
 
@@ -90,12 +91,6 @@ async function markFailed(syncId: string, errorMessage: string): Promise<void> {
     );
 }
 
-
-// Every synced table is protected by row-level security policies that key off auth.uid(). With no session the client sends the publishable key, PostgREST runs the statement as `anon`, auth.uid() is null and every push is rejected with "new row violates row-level security policy".
-async function getSyncUserId(): Promise<string | null> {
-    const { data } = await supabase.auth.getSession();
-    return data.session?.user.id ?? null;
-}
 
 // Pushes one queued change to Supabase using the config for its table
 async function pushRow(row: SyncLogRow, authUserId: string): Promise<string | null> {
@@ -244,7 +239,14 @@ async function pullTable(
         .gt(config.pull.watermarkColumn, since)
         .order(config.pull.watermarkColumn, { ascending: true });
 
-    if (error || !data) return { pulled: 0, skipped: 0 };
+    // RLS filters a SELECT rather than rejecting it, so an unauthorised pull comes back as an empty list with no error — indistinguishable from "nothing new". Only a real error is worth reporting here; the caller guards the identity.
+    if (error) {
+        if (!isTransientNetworkError(error.message)) {
+            console.error(`[SyncService] PULL error on ${table}:`, error.message, error);
+        }
+        return { pulled: 0, skipped: 0 };
+    }
+    if (!data) return { pulled: 0, skipped: 0 };
 
     let pulled = 0;
     let skipped = 0;
@@ -307,7 +309,7 @@ async function drainQueue(): Promise<SyncSummary> {
     }
 
     // Without a session every row would be rejected by RLS, marked failed and left pending — the same doomed request per queued row every 30s. The queue is durable, so wait for a session instead of burning the cycle.
-    const authUserId = await getSyncUserId();
+    const authUserId = await AuthService.getAuthUserId();
     if (!authUserId) {
         if (pendingRows.length > 0) reportAuthPaused(pendingRows.length);
         return { attempted: 0, succeeded: 0, failed: 0 };
@@ -351,6 +353,11 @@ async function pullAll(patientId: string): Promise<PullSummary> {
         return { pulled: 0, skipped: 0 };
     }
 
+    // Without a session RLS filters every row out and the pull "succeeds" having fetched nothing, leaving the device silently stale. Skip it so the state is a paused sync rather than an empty one.
+    if (!(await AuthService.getAuthUserId())) {
+        return { pulled: 0, skipped: 0 };
+    }
+
     let pulled = 0;
     let skipped = 0;
     for (const table of PULL_ORDER) {
@@ -366,6 +373,11 @@ async function pullAll(patientId: string): Promise<PullSummary> {
 // Pulls everything a caregiver device needs. Patient is fetched by caregiver_id because on a fresh device there is no local Patient row to derive a patient_id from; only once those land can the per-patient children be scoped. Without this, a caregiver device pushed its queue up and never pulled anything back down.
 async function pullAllForCaregiver(caregiverId: string): Promise<PullSummary> {
     if (!isDatabaseReady() || !isOnline()) {
+        return { pulled: 0, skipped: 0 };
+    }
+
+    // Same reasoning as pullAll — an unauthenticated pull returns nothing and reports success.
+    if (!(await AuthService.getAuthUserId())) {
         return { pulled: 0, skipped: 0 };
     }
 

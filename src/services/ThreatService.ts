@@ -1,5 +1,6 @@
 import { getDatabase } from '@/database/local/db';
 import { supabase } from '@/database/remote/supabaseClient';
+import { AuthService } from '@/services/AuthService';
 import type { Threat } from '@/models/Threat';
 import * as Crypto from 'expo-crypto';
 
@@ -147,6 +148,11 @@ async function resolveThreat(threatId: string): Promise<ServiceResult> {
 async function pullThreatsFromCloud(
     patientId: string
 ): Promise<ServiceResult<number>> {
+    // RLS filters this select rather than rejecting it, so with no session it comes back empty and the pull reports a successful sync of zero rows while the device quietly goes stale.
+    if (!(await AuthService.getAuthUserId())) {
+        return { data: null, error: 'Not authenticated.' };
+    }
+
     const { data: rows, error: fetchError } = await supabase
         .from('Threat')
         .select('*')

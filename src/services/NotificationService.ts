@@ -3,6 +3,8 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { REMINDER_HOUR, REMINDER_MINUTE } from '@/constants/config';
 import { supabase } from '@/database/remote/supabaseClient';
+import { AuthService } from '@/services/AuthService';
+import { isOnline } from '@/utils/connectivity';
 
 // Sets how notifications behave when the app is open (foreground)
 Notifications.setNotificationHandler({
@@ -61,26 +63,54 @@ async function registerForPushNotifications(): Promise<string | null> {
     return token;
 }
 
-// Saves the caregiver's push token to Supabase so their paired patient's device can look it up
-async function savePushTokenForCaregiver(caregiverId: string, token: string): Promise<void> {
+// Saves the caregiver's push token to Supabase so their paired patient's device can look it up.
+// Returns whether the row is stored: this runs once per app open and every later emergency lookup depends on it, so a caller that gets false must try again rather than leaving the caregiver unreachable.
+async function savePushTokenForCaregiver(caregiverId: string, token: string): Promise<boolean> {
+    // "CaregiverPushToken: own row only" checks caregiver_id = auth.uid(), so a missing or mismatched session is a guaranteed RLS rejection — not worth the round trip.
+    const authUserId = await AuthService.getAuthUserId();
+    if (authUserId !== caregiverId) {
+        console.warn(
+            `[NotificationService] Skipping push token save — session user ${authUserId ?? 'none'} does not own caregiver ${caregiverId}.`
+        );
+        return false;
+    }
+
+    if (!isOnline()) {
+        console.warn('[NotificationService] Offline — push token not saved yet, will retry.');
+        return false;
+    }
+
     const { error } = await supabase
         .from('CaregiverPushToken')
         .upsert({ caregiver_id: caregiverId, push_token: token, updated_at: new Date().toISOString() });
-    
+
     if (error) {
         console.error('[NotificationService] Failed to save push token to Supabase:', error);
+        return false;
     }
+
+    return true;
 }
 
 // Looks up the caregiver's push token from Supabase
 async function getPushTokenForCaregiver(caregiverId: string): Promise<string | null> {
     console.log(`[NotificationService] Looking up push token for caregiver: ${caregiverId}`);
+
+    // "CaregiverPushToken: paired patient reads" resolves auth.uid() to a Patient row, so with no session this returns nothing and the emergency push is silently never sent. The callers only report "token not found", so name the real reason here.
+    if (!(await AuthService.getAuthUserId())) {
+        console.error(
+            '[NotificationService] No Supabase session — cannot look up the caregiver push token, so no emergency push will be sent. Re-pair this device.'
+        );
+        return null;
+    }
+
+    // maybeSingle rather than single: no row is a legitimate outcome (the caregiver never registered), and single reports it as an error that reads like a failure.
     const { data, error } = await supabase
         .from('CaregiverPushToken')
         .select('push_token')
         .eq('caregiver_id', caregiverId)
-        .single();
-        
+        .maybeSingle();
+
     if (error) {
         console.error('[NotificationService] Error fetching push token:', error);
     }
