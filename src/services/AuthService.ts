@@ -220,6 +220,12 @@ async function getCurrentUser(): Promise<AuthUser | null> {
 // Id and role of the signed-in user, read straight from the persisted session.
 // Unlike getCurrentUser this never touches the network — the background sync cycle runs every 30s
 // and does not need the Caregiver profile lookup that resolveAuthUser performs.
+// The id every RLS policy will evaluate auth.uid() against. With no session the client falls back to the publishable key, PostgREST runs the statement as `anon`, auth.uid() is null, and every policy on every table evaluates false — a write is rejected outright while a read silently returns nothing.
+async function getAuthUserId(): Promise<string | null> {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.user.id ?? null;
+}
+
 async function getSessionIdentity(): Promise<{ id: string; role: UserRole } | null> {
     const { data } = await supabase.auth.getSession();
     const user = data.session?.user;
@@ -257,6 +263,7 @@ export const AuthService = {
     signOut, 
     getSession,
     getCurrentUser,
+    getAuthUserId,
     getSessionIdentity,
     onAuthStateChange,
 };

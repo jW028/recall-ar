@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
+import { AppState } from 'react-native';
 
 // Caregiver app defaults to light with an optional dark mode (persisted preference)
 export default function CaregiverLayout() {
@@ -23,13 +24,16 @@ export default function CaregiverLayout() {
         const userId = user?.id;
         if (!userId) return;
 
+        let saved = false;
+
         // Register for push notifications when the caregiver logs in/opens the app
         async function setupPushNotifications(uid: string) {
+            if (saved) return;
             try {
                 const token = await NotificationService.registerForPushNotifications();
                 if (token) {
-                    await NotificationService.savePushTokenForCaregiver(uid, token);
-                    console.log('[CaregiverLayout] Push token registered and saved:', token);
+                    saved = await NotificationService.savePushTokenForCaregiver(uid, token);
+                    if (saved) console.log('[CaregiverLayout] Push token registered and saved:', token);
                 }
             } catch (err) {
                 console.warn('[CaregiverLayout] Error setting up push notifications:', err);
@@ -37,6 +41,13 @@ export default function CaregiverLayout() {
         }
 
         setupPushNotifications(userId);
+
+        // The save legitimately fails while offline or before the session settles, and every emergency push the patient sends depends on that row existing. Retry on the way back to the foreground rather than leaving the caregiver unreachable until the next cold start.
+        const subscription = AppState.addEventListener('change', (state) => {
+            if (state === 'active') setupPushNotifications(userId);
+        });
+
+        return () => subscription.remove();
     }, [user?.id]);
 
     // Tapping a push should land on the thing it is about — a support reply opens that ticket.

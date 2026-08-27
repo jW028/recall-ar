@@ -1,5 +1,6 @@
 import { getDatabase } from '@/database/local/db';
 import { supabase } from '@/database/remote/supabaseClient';
+import { AuthService } from '@/services/AuthService';
 import type { Geofence } from '@/models/Geofence';
 import type { GeofenceEvent } from '@/models/GeofenceEvent';
 import * as Crypto from 'expo-crypto';
@@ -257,6 +258,11 @@ async function getEventsByPatient(
 async function pullGeofencesFromCloud(
     patientId: string
 ): Promise<ServiceResult<number>> {
+    // Same as pullThreatsFromCloud — an unauthorised select is an empty select, so this would report success having pulled nothing.
+    if (!(await AuthService.getAuthUserId())) {
+        return { data: null, error: 'Not authenticated.' };
+    }
+
     const { data: rows, error: fetchError } = await supabase
         .from('Geofence')
         .select('*')

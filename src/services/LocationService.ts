@@ -1,4 +1,5 @@
 import { supabase } from '@/database/remote/supabaseClient';
+import { AuthService } from '@/services/AuthService';
 import { GeofenceService } from '@/services/GeofenceService';
 import { isOnline, isTransientNetworkError } from '@/utils/connectivity';
 
@@ -35,6 +36,11 @@ async function publishLocation(
 
     if (!isValidUUID(patientId)) {
         return { data: null, error: 'Invalid patient ID format.' };
+    }
+
+    // "PatientLocation: patient self" checks auth.uid() against Patient.auth_user_id. A paired device whose session was lost still runs this loop, so without the guard every fix is an RLS rejection logged once per 30s tick.
+    if (!(await AuthService.getAuthUserId())) {
+        return { data: null, error: 'Not authenticated' };
     }
 
     const { error } = await supabase.from('PatientLocation').insert({
