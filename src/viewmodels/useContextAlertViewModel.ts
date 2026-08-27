@@ -5,13 +5,14 @@ import type {
 } from '@/models/ContextAlert';
 import { ContextAlertService } from '@/services/ContextAlertService';
 import { SyncService } from '@/services/SyncService';
-import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 
 export interface UseContextAlertViewModel {
     alerts: ContextAlert[];
     isLoading: boolean;
     error: string | null;
-    refresh: () => Promise<void>;
+    refresh: (options?: { silent?: boolean }) => Promise<void>;
     createAlert: (params: Omit<CreateContextAlertParams, 'patientId'>) => Promise<boolean>;
     updateAlert: (alertId: string, updates: UpdateContextAlertParams) => Promise<boolean>;
     deleteAlert: (alertId: string) => Promise<boolean>;
@@ -25,12 +26,14 @@ export function useContextAlertViewModel(
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const refresh = useCallback(async () => {
+    const refresh = useCallback(async (options?: { silent?: boolean }) => {
         if (!patientId) {
             setIsLoading(false);
             return;
         }
-        setIsLoading(true);
+        if (!options?.silent) {
+            setIsLoading(true);
+        }
         setError(null);
 
         // Sync local queue first
@@ -45,9 +48,11 @@ export function useContextAlertViewModel(
         setIsLoading(false);
     }, [patientId]);
 
-    useEffect(() => {
-        refresh();
-    }, [refresh]);
+    useFocusEffect(
+        useCallback(() => {
+            refresh({ silent: alerts.length > 0 });
+        }, [refresh, alerts.length])
+    );
 
     const createAlert = useCallback(
         async (params: Omit<CreateContextAlertParams, 'patientId'>): Promise<boolean> => {

@@ -26,6 +26,7 @@ import {
     Pressable,
     ScrollView,
     StyleSheet,
+    Switch,
     Text,
     TextInput,
     View,
@@ -111,6 +112,7 @@ export default function ContextAlertDetailScreen() {
     const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
     const [scheduledDateTime, setScheduledDateTime] = useState<Date>(new Date());
     const [frequency, setFrequency] = useState<ContextAlertFrequency>('Daily');
+    const [hasSchedule, setHasSchedule] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Native DateTimePicker state
@@ -173,7 +175,8 @@ export default function ContextAlertDetailScreen() {
         setSelectedAssetId(alert.assetId ?? null);
         const parsed = alert.ctxAlertTime ? new Date(alert.ctxAlertTime) : new Date();
         setScheduledDateTime(isNaN(parsed.getTime()) ? new Date() : parsed);
-        setFrequency(alert.frequency);
+        setFrequency(alert.frequency || 'Daily');
+        setHasSchedule(Boolean(alert.ctxAlertTime));
         setModalView('form');
         setIsEditModalOpen(true);
     };
@@ -189,9 +192,9 @@ export default function ContextAlertDetailScreen() {
             ctxAlertMsg: msg.trim(),
             ctxAlertDesc: desc.trim() || null,
             ctxAlertType: alertType,
-            ctxAlertTime: scheduledDateTime.toISOString(),
+            ctxAlertTime: hasSchedule ? scheduledDateTime.toISOString() : null,
             assetId: selectedAssetId,
-            frequency,
+            frequency: hasSchedule ? frequency : null,
         });
 
         setIsSubmitting(false);
@@ -272,9 +275,19 @@ export default function ContextAlertDetailScreen() {
     }
 
     const typeConfig = ALERT_TYPES.find((t) => t.type === (alert.ctxAlertType || 'Reminder')) || ALERT_TYPES[0];
+    const isDismissed = alert.ctxAlertStatus === 'Dismissed';
     const isAcknowledged = alert.ackStatus === 'Acknowledged';
     const isExpired = checkIsAlertExpired(alert.ctxAlertTime, alert.ackStatus);
     const isTriggered = alert.ctxAlertStatus === 'Triggered';
+
+    const toggleAlertStatus = async () => {
+        if (!id || !alert) return;
+        const newStatus = isDismissed ? 'Active' : 'Dismissed';
+        await updateAlert(id, {
+            ctxAlertStatus: newStatus,
+            ...(newStatus === 'Active' ? { ackStatus: 'Unacknowledged', ackTime: null } : {}),
+        });
+    };
 
     return (
         <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
@@ -294,34 +307,63 @@ export default function ContextAlertDetailScreen() {
                 <View style={styles.heroCard}>
                     <View style={styles.heroHeaderRow}>
                         {/* Type Icon Badge */}
-                        <View style={[styles.typeBadge, { backgroundColor: typeConfig.color + '15' }]}>
-                            <Ionicons name={typeConfig.icon} size={16} color={typeConfig.color} />
-                            <Text style={[styles.typeBadgeText, { color: typeConfig.color }]}>
+                        <View
+                            style={[
+                                styles.typeBadge,
+                                { backgroundColor: typeConfig.color + (isDismissed ? '0A' : '15') },
+                            ]}
+                        >
+                            <Ionicons
+                                name={typeConfig.icon}
+                                size={16}
+                                color={isDismissed ? theme.textMuted : typeConfig.color}
+                            />
+                            <Text
+                                style={[
+                                    styles.typeBadgeText,
+                                    { color: isDismissed ? theme.textMuted : typeConfig.color },
+                                ]}
+                            >
                                 {typeConfig.label}
                             </Text>
                         </View>
 
-                        {/* Status Badge */}
-                        {isAcknowledged ? (
-                            <View style={styles.doneBadge}>
-                                <Text style={styles.doneBadgeText}>✓ Done</Text>
-                            </View>
-                        ) : isExpired ? (
-                            <View style={styles.expiredBadge}>
-                                <Text style={styles.expiredBadgeText}>Expired</Text>
-                            </View>
-                        ) : isTriggered ? (
-                            <View style={styles.triggeredBadge}>
-                                <Text style={styles.triggeredBadgeText}>Triggered</Text>
-                            </View>
-                        ) : (
-                            <View style={styles.activeBadge}>
-                                <Text style={styles.activeBadgeText}>Active</Text>
-                            </View>
-                        )}
+                        {/* Status Badge & Toggle Switch */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                            {isDismissed ? (
+                                <View style={styles.expiredBadge}>
+                                    <Text style={styles.expiredBadgeText}>Deactivated</Text>
+                                </View>
+                            ) : isAcknowledged ? (
+                                <View style={styles.doneBadge}>
+                                    <Text style={styles.doneBadgeText}>✓ Done</Text>
+                                </View>
+                            ) : isExpired ? (
+                                <View style={styles.expiredBadge}>
+                                    <Text style={styles.expiredBadgeText}>Expired</Text>
+                                </View>
+                            ) : isTriggered ? (
+                                <View style={styles.triggeredBadge}>
+                                    <Text style={styles.triggeredBadgeText}>Triggered</Text>
+                                </View>
+                            ) : (
+                                <View style={styles.activeBadge}>
+                                    <Text style={styles.activeBadgeText}>Active</Text>
+                                </View>
+                            )}
+
+                            <Switch
+                                value={!isDismissed}
+                                onValueChange={toggleAlertStatus}
+                                trackColor={{ false: theme.border, true: theme.primary }}
+                                thumbColor={Platform.OS === 'android' ? (!isDismissed ? '#FFFFFF' : '#F4F3F4') : undefined}
+                            />
+                        </View>
                     </View>
 
-                    <Text style={styles.heroTitle}>{alert.ctxAlertMsg}</Text>
+                    <Text style={[styles.heroTitle, isDismissed && { color: theme.textMuted }]}>
+                        {alert.ctxAlertMsg}
+                    </Text>
                     {alert.ctxAlertDesc ? (
                         <Text style={styles.heroDesc}>{alert.ctxAlertDesc}</Text>
                     ) : null}
@@ -337,7 +379,9 @@ export default function ContextAlertDetailScreen() {
                         </View>
                         <View style={{ flex: 1 }}>
                             <Text style={styles.infoLabel}>Scheduled Time</Text>
-                            <Text style={styles.infoVal}>{formatDisplayDateTime(alert.ctxAlertTime)}</Text>
+                            <Text style={styles.infoVal}>
+                                {alert.ctxAlertTime ? formatDisplayDateTime(alert.ctxAlertTime) : 'Anytime (No scheduled time constraint)'}
+                            </Text>
                         </View>
                     </View>
 
@@ -349,7 +393,9 @@ export default function ContextAlertDetailScreen() {
                         </View>
                         <View style={{ flex: 1 }}>
                             <Text style={styles.infoLabel}>Frequency</Text>
-                            <Text style={styles.infoVal}>{alert.frequency}</Text>
+                            <Text style={styles.infoVal}>
+                                {alert.ctxAlertTime && alert.frequency ? alert.frequency : 'None (Anytime)'}
+                            </Text>
                         </View>
                     </View>
 
@@ -550,80 +596,102 @@ export default function ContextAlertDetailScreen() {
                                         </View>
                                     </Pressable>
 
-                                    {/* Scheduled Date & Time Fields */}
-                                    <Text style={styles.inputLabel}>Scheduled Date & Time</Text>
-                                    <Text style={styles.inputHint}>
-                                        Tap date or time field to select using native picker.
-                                    </Text>
-
-                                    <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
-                                        <Pressable
-                                            style={[styles.timeInputField, { flex: 1.2 }]}
-                                            onPress={handleOpenDatePicker}
-                                        >
-                                            <View style={styles.timeInputTextGroup}>
-                                                <Ionicons name="calendar-outline" size={20} color={theme.primary} />
-                                                <Text style={styles.timeInputValText}>
-                                                    {formatDisplayDate(scheduledDateTime)}
-                                                </Text>
-                                            </View>
-                                        </Pressable>
-
-                                        <Pressable
-                                            style={[styles.timeInputField, { flex: 1 }]}
-                                            onPress={handleOpenTimePicker}
-                                        >
-                                            <View style={styles.timeInputTextGroup}>
-                                                <Ionicons name="alarm-outline" size={20} color={theme.primary} />
-                                                <Text style={styles.timeInputValText}>
-                                                    {formatDisplayTimeFromDate(scheduledDateTime)}
-                                                </Text>
-                                            </View>
-                                            <View style={styles.clockIconBadge}>
-                                                <Ionicons name="time" size={22} color={theme.primary} />
-                                            </View>
-                                        </Pressable>
+                                    {/* Scheduled Date, Time & Frequency Toggle Card */}
+                                    <View style={styles.scheduleSwitchCard}>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.scheduleSwitchLabel}>Set Scheduled Time & Frequency</Text>
+                                            <Text style={styles.scheduleSwitchHint}>
+                                                {hasSchedule
+                                                    ? 'Reminder will trigger at the selected date, time & frequency.'
+                                                    : 'Optional: When off, reminder triggers anytime target object is detected.'}
+                                            </Text>
+                                        </View>
+                                        <Switch
+                                            value={hasSchedule}
+                                            onValueChange={setHasSchedule}
+                                            trackColor={{ false: theme.border, true: theme.primary }}
+                                            thumbColor={Platform.OS === 'android' ? (hasSchedule ? '#FFFFFF' : '#F4F3F4') : undefined}
+                                        />
                                     </View>
 
-                                    {/* Native DateTimePicker Dialogs */}
-                                    {showNativeDatePicker && DateTimePickerComponent && (
-                                        <DateTimePickerComponent
-                                            value={scheduledDateTime}
-                                            mode="date"
-                                            display={Platform.OS === 'android' ? 'calendar' : 'spinner'}
-                                            onChange={handleNativeDateChange}
-                                        />
-                                    )}
+                                    {hasSchedule && (
+                                        <>
+                                            {/* Scheduled Date & Time Fields */}
+                                            <Text style={styles.inputLabel}>Scheduled Date & Time</Text>
+                                            <Text style={styles.inputHint}>
+                                                Tap date or time field to select using native picker.
+                                            </Text>
 
-                                    {showNativeTimePicker && DateTimePickerComponent && (
-                                        <DateTimePickerComponent
-                                            value={scheduledDateTime}
-                                            mode="time"
-                                            is24Hour={false}
-                                            display={Platform.OS === 'android' ? 'clock' : 'spinner'}
-                                            onChange={handleNativeTimeChange}
-                                        />
-                                    )}
-
-                                    <Text style={styles.inputLabel}>Frequency</Text>
-                                    <View style={styles.freqRow}>
-                                        {(['Once', 'Daily', 'Weekly'] as ContextAlertFrequency[]).map((f) => (
-                                            <Pressable
-                                                key={f}
-                                                style={[styles.freqOption, frequency === f && styles.freqOptionSelected]}
-                                                onPress={() => setFrequency(f)}
-                                            >
-                                                <Text
-                                                    style={[
-                                                        styles.freqOptionText,
-                                                        frequency === f && styles.freqOptionTextSelected,
-                                                    ]}
+                                            <View style={{ flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                                                <Pressable
+                                                    style={[styles.timeInputField, { flex: 1.2 }]}
+                                                    onPress={handleOpenDatePicker}
                                                 >
-                                                    {f}
-                                                </Text>
-                                            </Pressable>
-                                        ))}
-                                    </View>
+                                                    <View style={styles.timeInputTextGroup}>
+                                                        <Ionicons name="calendar-outline" size={20} color={theme.primary} />
+                                                        <Text style={styles.timeInputValText}>
+                                                            {formatDisplayDate(scheduledDateTime)}
+                                                        </Text>
+                                                    </View>
+                                                </Pressable>
+
+                                                <Pressable
+                                                    style={[styles.timeInputField, { flex: 1 }]}
+                                                    onPress={handleOpenTimePicker}
+                                                >
+                                                    <View style={styles.timeInputTextGroup}>
+                                                        <Ionicons name="alarm-outline" size={20} color={theme.primary} />
+                                                        <Text style={styles.timeInputValText}>
+                                                            {formatDisplayTimeFromDate(scheduledDateTime)}
+                                                        </Text>
+                                                    </View>
+                                                    <View style={styles.clockIconBadge}>
+                                                        <Ionicons name="time" size={22} color={theme.primary} />
+                                                    </View>
+                                                </Pressable>
+                                            </View>
+
+                                            {/* Native DateTimePicker Dialogs */}
+                                            {showNativeDatePicker && DateTimePickerComponent && (
+                                                <DateTimePickerComponent
+                                                    value={scheduledDateTime}
+                                                    mode="date"
+                                                    display={Platform.OS === 'android' ? 'calendar' : 'spinner'}
+                                                    onChange={handleNativeDateChange}
+                                                />
+                                            )}
+
+                                            {showNativeTimePicker && DateTimePickerComponent && (
+                                                <DateTimePickerComponent
+                                                    value={scheduledDateTime}
+                                                    mode="time"
+                                                    is24Hour={false}
+                                                    display={Platform.OS === 'android' ? 'clock' : 'spinner'}
+                                                    onChange={handleNativeTimeChange}
+                                                />
+                                            )}
+
+                                            <Text style={styles.inputLabel}>Frequency</Text>
+                                            <View style={styles.freqRow}>
+                                                {(['Once', 'Daily', 'Weekly'] as ContextAlertFrequency[]).map((f) => (
+                                                    <Pressable
+                                                        key={f}
+                                                        style={[styles.freqOption, frequency === f && styles.freqOptionSelected]}
+                                                        onPress={() => setFrequency(f)}
+                                                    >
+                                                        <Text
+                                                            style={[
+                                                                styles.freqOptionText,
+                                                                frequency === f && styles.freqOptionTextSelected,
+                                                            ]}
+                                                        >
+                                                            {f}
+                                                        </Text>
+                                                    </Pressable>
+                                                ))}
+                                            </View>
+                                        </>
+                                    )}
                                 </ScrollView>
 
                                 {/* Fixed Bottom Action Button */}
@@ -1069,6 +1137,30 @@ function createStyles(theme: Theme) {
             color: theme.textMuted,
             marginTop: -6,
             marginBottom: 8,
+        },
+        scheduleSwitchCard: {
+            backgroundColor: theme.pageBackground,
+            borderRadius: 12,
+            padding: 14,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderWidth: 1,
+            borderColor: theme.border,
+            marginTop: 8,
+            marginBottom: 12,
+            gap: 12,
+        },
+        scheduleSwitchLabel: {
+            fontSize: 14,
+            fontWeight: '700',
+            color: theme.heading,
+            marginBottom: 2,
+        },
+        scheduleSwitchHint: {
+            fontSize: 11,
+            color: theme.textMuted,
+            lineHeight: 15,
         },
         typeSelectorRow: {
             flexDirection: 'row',

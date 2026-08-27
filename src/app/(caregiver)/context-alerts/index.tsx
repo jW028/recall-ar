@@ -19,6 +19,7 @@ import {
     Pressable,
     ScrollView,
     StyleSheet,
+    Switch,
     Text,
     TextInput,
     View,
@@ -84,8 +85,18 @@ export default function ContextAlertsDashboardScreen() {
         error,
         refresh,
         createAlert,
+        updateAlert,
         acknowledgeAlert,
     } = useContextAlertViewModel(patientId);
+
+    const toggleAlertStatus = async (item: ContextAlert) => {
+        const isCurrentlyActive = item.ctxAlertStatus !== 'Dismissed';
+        const newStatus = isCurrentlyActive ? 'Dismissed' : 'Active';
+        await updateAlert(item.ctxAlertId, {
+            ctxAlertStatus: newStatus,
+            ...(newStatus === 'Active' ? { ackStatus: 'Unacknowledged', ackTime: null } : {}),
+        });
+    };
 
     const { assets } = useMemoryAssetListViewModel(patientId);
     const objectAssets = useMemo(() => assets.filter(isObject), [assets]);
@@ -106,6 +117,7 @@ export default function ContextAlertsDashboardScreen() {
         return d;
     });
     const [frequency, setFrequency] = useState<ContextAlertFrequency>('Daily');
+    const [hasSchedule, setHasSchedule] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Native DateTimePicker state
@@ -168,12 +180,12 @@ export default function ContextAlertsDashboardScreen() {
 
     // Group alerts into sections matching reference mockup
     const upcomingAlerts = useMemo(
-        () => alerts.filter((a) => a.ctxAlertStatus === 'Active' && !checkIsAlertExpired(a.ctxAlertTime, a.ackStatus)),
+        () => alerts.filter((a) => a.ctxAlertStatus === 'Active' && (!a.ctxAlertTime || !checkIsAlertExpired(a.ctxAlertTime, a.ackStatus))),
         [alerts]
     );
 
     const earlierAlerts = useMemo(
-        () => alerts.filter((a) => a.ctxAlertStatus === 'Triggered' || a.ackStatus === 'Acknowledged' || checkIsAlertExpired(a.ctxAlertTime, a.ackStatus)),
+        () => alerts.filter((a) => (a.ctxAlertStatus === 'Triggered' || a.ackStatus === 'Acknowledged' || (a.ctxAlertTime && checkIsAlertExpired(a.ctxAlertTime, a.ackStatus))) && a.ctxAlertStatus !== 'Dismissed'),
         [alerts]
     );
 
@@ -191,6 +203,7 @@ export default function ContextAlertsDashboardScreen() {
         d.setHours(8, 0, 0, 0);
         setScheduledDateTime(d);
         setFrequency('Daily');
+        setHasSchedule(false);
         setModalView('form');
         setIsAddModalOpen(true);
     };
@@ -206,9 +219,9 @@ export default function ContextAlertsDashboardScreen() {
             ctxAlertMsg: msg.trim(),
             ctxAlertDesc: desc.trim() || null,
             ctxAlertType: alertType,
-            ctxAlertTime: scheduledDateTime.toISOString(),
+            ctxAlertTime: hasSchedule ? scheduledDateTime.toISOString() : null,
             assetId: selectedAssetId,
-            frequency,
+            frequency: hasSchedule ? frequency : null,
         });
 
         setIsSubmitting(false);
@@ -223,6 +236,7 @@ export default function ContextAlertsDashboardScreen() {
             d.setHours(8, 0, 0, 0);
             setScheduledDateTime(d);
             setFrequency('Daily');
+            setHasSchedule(false);
         } else {
             Alert.alert('Error', 'Failed to create contextual alert. Please try again.');
         }
@@ -246,6 +260,7 @@ export default function ContextAlertsDashboardScreen() {
 
     const renderAlertCard = (item: ContextAlert) => {
         const targetAsset = assets.find((a) => a.assetId === item.assetId);
+        const isDismissed = item.ctxAlertStatus === 'Dismissed';
         const isAcknowledged = item.ackStatus === 'Acknowledged';
         const isExpired = checkIsAlertExpired(item.ctxAlertTime, item.ackStatus);
         const isTriggered = item.ctxAlertStatus === 'Triggered';
@@ -254,25 +269,82 @@ export default function ContextAlertsDashboardScreen() {
         return (
             <Pressable
                 key={item.ctxAlertId}
-                style={[styles.card, isAcknowledged && styles.cardAcknowledged]}
+                style={[
+                    styles.card,
+                    isDismissed && styles.cardDismissed,
+                    !isDismissed && isAcknowledged && styles.cardAcknowledged,
+                ]}
                 onPress={() => router.push(`/(caregiver)/context-alerts/${item.ctxAlertId}` as any)}
             >
                 {/* Left Circular Icon Box */}
-                <View style={[styles.cardIconBox, { backgroundColor: typeConfig.color + '15' }]}>
-                    <Ionicons name={typeConfig.icon} size={20} color={typeConfig.color} />
+                <View
+                    style={[
+                        styles.cardIconBox,
+                        { backgroundColor: typeConfig.color + (isDismissed ? '0A' : '15') },
+                    ]}
+                >
+                    <Ionicons
+                        name={typeConfig.icon}
+                        size={20}
+                        color={isDismissed ? theme.textMuted : typeConfig.color}
+                    />
                 </View>
 
                 {/* Middle Info */}
                 <View style={styles.cardMainContent}>
-                    <Text style={styles.cardTitle}>{item.ctxAlertMsg}</Text>
+                    <Text
+                        style={[styles.cardTitle, isDismissed && styles.cardTitleDismissed]}
+                        numberOfLines={1}
+                    >
+                        {item.ctxAlertMsg}
+                    </Text>
 
                     <View style={styles.cardSubRow}>
                         {/* Category Chip Badge */}
-                        <View style={[styles.typeChipBadge, { backgroundColor: typeConfig.color + '15' }]}>
-                            <Text style={[styles.cardTypeChipText, { color: typeConfig.color }]}>
+                        <View
+                            style={[
+                                styles.typeChipBadge,
+                                { backgroundColor: typeConfig.color + (isDismissed ? '0A' : '15') },
+                            ]}
+                        >
+                            <Text
+                                style={[
+                                    styles.cardTypeChipText,
+                                    { color: isDismissed ? theme.textMuted : typeConfig.color },
+                                ]}
+                            >
                                 {typeConfig.label}
                             </Text>
                         </View>
+
+                        {/* Status Badge (Done / Expired / Triggered) next to Alert Type */}
+                        {!isDismissed && isAcknowledged && (
+                            <View style={styles.doneBadge}>
+                                <Text style={styles.doneBadgeText}>✓ Done</Text>
+                            </View>
+                        )}
+                        {!isDismissed && !isAcknowledged && isExpired && (
+                            <Pressable
+                                style={styles.expiredBadge}
+                                onPress={(e) => {
+                                    e.stopPropagation();
+                                    acknowledgeAlert(item.ctxAlertId);
+                                }}
+                            >
+                                <Text style={styles.expiredBadgeText}>Expired</Text>
+                            </Pressable>
+                        )}
+                        {!isDismissed && !isAcknowledged && isTriggered && (
+                            <Pressable
+                                style={styles.triggeredBadge}
+                                onPress={(e) => {
+                                    e.stopPropagation();
+                                    acknowledgeAlert(item.ctxAlertId);
+                                }}
+                            >
+                                <Text style={styles.triggeredBadgeText}>Triggered</Text>
+                            </Pressable>
+                        )}
 
                         {/* Scheduled Time Tag */}
                         <View style={styles.timeTag}>
@@ -298,33 +370,23 @@ export default function ContextAlertsDashboardScreen() {
                     ) : null}
                 </View>
 
-                {/* Right Status Badge & Forward Arrow */}
+                {/* Right On/Off Switch & Forward Arrow */}
                 <View style={styles.cardRightActions}>
-                    {isAcknowledged ? (
-                        <View style={styles.doneBadge}>
-                            <Text style={styles.doneBadgeText}>✓ Done</Text>
-                        </View>
-                    ) : isExpired ? (
-                        <Pressable
-                            style={styles.expiredBadge}
-                            onPress={(e) => {
-                                e.stopPropagation();
-                                acknowledgeAlert(item.ctxAlertId);
-                            }}
-                        >
-                            <Text style={styles.expiredBadgeText}>Expired</Text>
-                        </Pressable>
-                    ) : isTriggered ? (
-                        <Pressable
-                            style={styles.triggeredBadge}
-                            onPress={(e) => {
-                                e.stopPropagation();
-                                acknowledgeAlert(item.ctxAlertId);
-                            }}
-                        >
-                            <Text style={styles.triggeredBadgeText}>Triggered</Text>
-                        </Pressable>
-                    ) : null}
+                    {/* On/Off Switch */}
+                    <Pressable
+                        hitSlop={8}
+                        onPress={(e) => {
+                            e.stopPropagation();
+                        }}
+                    >
+                        <Switch
+                            value={!isDismissed}
+                            onValueChange={() => toggleAlertStatus(item)}
+                            trackColor={{ false: theme.border, true: theme.primary }}
+                            thumbColor={Platform.OS === 'android' ? (!isDismissed ? '#FFFFFF' : '#F4F3F4') : undefined}
+                            style={Platform.OS === 'ios' ? { transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] } : undefined}
+                        />
+                    </Pressable>
 
                     <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />
                 </View>
@@ -380,10 +442,10 @@ export default function ContextAlertsDashboardScreen() {
                     </View>
                 )}
 
-                {/* Section 3: All Reminders */}
+                {/* Section 3: Deactivated Reminders */}
                 {otherAlerts.length > 0 && (
                     <View style={styles.sectionContainer}>
-                        <Text style={styles.sectionHeaderTitle}>All Reminders</Text>
+                        <Text style={styles.sectionHeaderTitle}>Deactivated Reminders</Text>
                         {otherAlerts.map(renderAlertCard)}
                     </View>
                 )}
@@ -522,80 +584,102 @@ export default function ContextAlertsDashboardScreen() {
                                         </View>
                                     </Pressable>
 
-                                    {/* Scheduled Date & Time Fields */}
-                                    <Text style={styles.inputLabel}>Scheduled Date & Time</Text>
-                                    <Text style={styles.inputHint}>
-                                        Tap date or time field to select using native picker.
-                                    </Text>
-
-                                    <View style={{ flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-                                        <Pressable
-                                            style={[styles.timeInputField, { flex: 1.2 }]}
-                                            onPress={handleOpenDatePicker}
-                                        >
-                                            <View style={styles.timeInputTextGroup}>
-                                                <Ionicons name="calendar-outline" size={20} color={theme.primary} />
-                                                <Text style={styles.timeInputValText}>
-                                                    {formatDisplayDate(scheduledDateTime)}
-                                                </Text>
-                                            </View>
-                                        </Pressable>
-
-                                        <Pressable
-                                            style={[styles.timeInputField, { flex: 1 }]}
-                                            onPress={handleOpenTimePicker}
-                                        >
-                                            <View style={styles.timeInputTextGroup}>
-                                                <Ionicons name="alarm-outline" size={20} color={theme.primary} />
-                                                <Text style={styles.timeInputValText}>
-                                                    {formatDisplayTimeFromDate(scheduledDateTime)}
-                                                </Text>
-                                            </View>
-                                            <View style={styles.clockIconBadge}>
-                                                <Ionicons name="time" size={22} color={theme.primary} />
-                                            </View>
-                                        </Pressable>
+                                    {/* Scheduled Date, Time & Frequency Toggle Card */}
+                                    <View style={styles.scheduleSwitchCard}>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.scheduleSwitchLabel}>Set Scheduled Time & Frequency</Text>
+                                            <Text style={styles.scheduleSwitchHint}>
+                                                {hasSchedule
+                                                    ? 'Reminder will trigger at the selected date, time & frequency.'
+                                                    : 'Optional: When off, reminder triggers anytime target object is detected.'}
+                                            </Text>
+                                        </View>
+                                        <Switch
+                                            value={hasSchedule}
+                                            onValueChange={setHasSchedule}
+                                            trackColor={{ false: theme.border, true: theme.primary }}
+                                            thumbColor={Platform.OS === 'android' ? (hasSchedule ? '#FFFFFF' : '#F4F3F4') : undefined}
+                                        />
                                     </View>
 
-                                    {/* Native DateTimePicker Dialogs */}
-                                    {showNativeDatePicker && DateTimePickerComponent && (
-                                        <DateTimePickerComponent
-                                            value={scheduledDateTime}
-                                            mode="date"
-                                            display={Platform.OS === 'android' ? 'calendar' : 'spinner'}
-                                            onChange={handleNativeDateChange}
-                                        />
-                                    )}
+                                    {hasSchedule && (
+                                        <>
+                                            {/* Scheduled Date & Time Fields */}
+                                            <Text style={styles.inputLabel}>Scheduled Date & Time</Text>
+                                            <Text style={styles.inputHint}>
+                                                Tap date or time field to select using native picker.
+                                            </Text>
 
-                                    {showNativeTimePicker && DateTimePickerComponent && (
-                                        <DateTimePickerComponent
-                                            value={scheduledDateTime}
-                                            mode="time"
-                                            is24Hour={false}
-                                            display={Platform.OS === 'android' ? 'clock' : 'spinner'}
-                                            onChange={handleNativeTimeChange}
-                                        />
-                                    )}
-
-                                    <Text style={styles.inputLabel}>Frequency</Text>
-                                    <View style={styles.freqRow}>
-                                        {(['Once', 'Daily', 'Weekly'] as ContextAlertFrequency[]).map((f) => (
-                                            <Pressable
-                                                key={f}
-                                                style={[styles.freqOption, frequency === f && styles.freqOptionSelected]}
-                                                onPress={() => setFrequency(f)}
-                                            >
-                                                <Text
-                                                    style={[
-                                                        styles.freqOptionText,
-                                                        frequency === f && styles.freqOptionTextSelected,
-                                                    ]}
+                                            <View style={{ flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                                                <Pressable
+                                                    style={[styles.timeInputField, { flex: 1.2 }]}
+                                                    onPress={handleOpenDatePicker}
                                                 >
-                                                    {f}
-                                                </Text>
-                                            </Pressable>
-                                        ))}
-                                    </View>
+                                                    <View style={styles.timeInputTextGroup}>
+                                                        <Ionicons name="calendar-outline" size={20} color={theme.primary} />
+                                                        <Text style={styles.timeInputValText}>
+                                                            {formatDisplayDate(scheduledDateTime)}
+                                                        </Text>
+                                                    </View>
+                                                </Pressable>
+
+                                                <Pressable
+                                                    style={[styles.timeInputField, { flex: 1 }]}
+                                                    onPress={handleOpenTimePicker}
+                                                >
+                                                    <View style={styles.timeInputTextGroup}>
+                                                        <Ionicons name="alarm-outline" size={20} color={theme.primary} />
+                                                        <Text style={styles.timeInputValText}>
+                                                            {formatDisplayTimeFromDate(scheduledDateTime)}
+                                                        </Text>
+                                                    </View>
+                                                    <View style={styles.clockIconBadge}>
+                                                        <Ionicons name="time" size={22} color={theme.primary} />
+                                                    </View>
+                                                </Pressable>
+                                            </View>
+
+                                            {/* Native DateTimePicker Dialogs */}
+                                            {showNativeDatePicker && DateTimePickerComponent && (
+                                                <DateTimePickerComponent
+                                                    value={scheduledDateTime}
+                                                    mode="date"
+                                                    display={Platform.OS === 'android' ? 'calendar' : 'spinner'}
+                                                    onChange={handleNativeDateChange}
+                                                />
+                                            )}
+
+                                            {showNativeTimePicker && DateTimePickerComponent && (
+                                                <DateTimePickerComponent
+                                                    value={scheduledDateTime}
+                                                    mode="time"
+                                                    is24Hour={false}
+                                                    display={Platform.OS === 'android' ? 'clock' : 'spinner'}
+                                                    onChange={handleNativeTimeChange}
+                                                />
+                                            )}
+
+                                            <Text style={styles.inputLabel}>Frequency</Text>
+                                            <View style={styles.freqRow}>
+                                                {(['Once', 'Daily', 'Weekly'] as ContextAlertFrequency[]).map((f) => (
+                                                    <Pressable
+                                                        key={f}
+                                                        style={[styles.freqOption, frequency === f && styles.freqOptionSelected]}
+                                                        onPress={() => setFrequency(f)}
+                                                    >
+                                                        <Text
+                                                            style={[
+                                                                styles.freqOptionText,
+                                                                frequency === f && styles.freqOptionTextSelected,
+                                                            ]}
+                                                        >
+                                                            {f}
+                                                        </Text>
+                                                    </Pressable>
+                                                ))}
+                                            </View>
+                                        </>
+                                    )}
                                 </ScrollView>
 
                                 {/* Fixed Bottom Action Button */}
@@ -836,6 +920,10 @@ function createStyles(theme: Theme) {
         cardAcknowledged: {
             opacity: 0.6,
         },
+        cardDismissed: {
+            opacity: 0.55,
+            backgroundColor: theme.cardBackground,
+        },
         cardIconBox: {
             width: 44,
             height: 44,
@@ -851,6 +939,9 @@ function createStyles(theme: Theme) {
             fontSize: 15,
             fontWeight: '700',
             color: theme.heading,
+        },
+        cardTitleDismissed: {
+            color: theme.textMuted,
         },
         cardSubRow: {
             flexDirection: 'row',
@@ -900,35 +991,35 @@ function createStyles(theme: Theme) {
         },
         doneBadge: {
             backgroundColor: '#E6F4EA',
-            paddingVertical: 4,
-            paddingHorizontal: 10,
-            borderRadius: 12,
+            paddingVertical: 2,
+            paddingHorizontal: 8,
+            borderRadius: 6,
         },
         doneBadgeText: {
             color: '#137333',
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: '700',
         },
         expiredBadge: {
             backgroundColor: '#FEE2E2',
-            paddingVertical: 4,
-            paddingHorizontal: 10,
-            borderRadius: 12,
+            paddingVertical: 2,
+            paddingHorizontal: 8,
+            borderRadius: 6,
         },
         expiredBadgeText: {
             color: '#DC2626',
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: '700',
         },
         triggeredBadge: {
             backgroundColor: '#FEF3C7',
-            paddingVertical: 4,
-            paddingHorizontal: 10,
-            borderRadius: 12,
+            paddingVertical: 2,
+            paddingHorizontal: 8,
+            borderRadius: 6,
         },
         triggeredBadgeText: {
             color: '#B45309',
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: '700',
         },
 
@@ -1013,6 +1104,30 @@ function createStyles(theme: Theme) {
             color: theme.textMuted,
             marginTop: -6,
             marginBottom: 8,
+        },
+        scheduleSwitchCard: {
+            backgroundColor: theme.pageBackground,
+            borderRadius: 12,
+            padding: 14,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderWidth: 1,
+            borderColor: theme.border,
+            marginTop: 8,
+            marginBottom: 12,
+            gap: 12,
+        },
+        scheduleSwitchLabel: {
+            fontSize: 14,
+            fontWeight: '700',
+            color: theme.heading,
+            marginBottom: 2,
+        },
+        scheduleSwitchHint: {
+            fontSize: 11,
+            color: theme.textMuted,
+            lineHeight: 15,
         },
         typeSelectorRow: {
             flexDirection: 'row',
