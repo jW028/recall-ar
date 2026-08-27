@@ -1,5 +1,6 @@
 import { supabase } from '@/database/remote/supabaseClient';
 import { GeofenceService } from '@/services/GeofenceService';
+import { isOnline, isTransientNetworkError } from '@/utils/connectivity';
 
 export interface PatientLocationData {
     latitude: number;
@@ -21,6 +22,11 @@ async function publishLocation(
     patientId: string,
     coords: { latitude: number; longitude: number; accuracy: number | null }
 ): Promise<ServiceResult> {
+    // Location is a live feed, not queued work — a fix taken while offline is stale by the time the connection returns, so skip the doomed request rather than logging a failure every tick.
+    if (!isOnline()) {
+        return { data: null, error: 'Offline' };
+    }
+
     const { error } = await supabase.from('PatientLocation').insert({
         patient_id: patientId,
         latitude: coords.latitude,
@@ -29,7 +35,9 @@ async function publishLocation(
     });
 
     if (error) {
-        console.warn('[LocationService] Failed to publish location:', error.message);
+        if (!isTransientNetworkError(error.message)) {
+            console.warn('[LocationService] Failed to publish location:', error.message);
+        }
         return { data: null, error: error.message };
     }
 
