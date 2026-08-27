@@ -12,6 +12,11 @@
       ]
     }
   },
+  "exclude": [
+    "admin",
+    "dist",
+    "supabase/functions"
+  ],
   "include": [
     "**/*.ts",
     "**/*.tsx",

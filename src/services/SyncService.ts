@@ -1,5 +1,6 @@
 import { getDatabase, isDatabaseReady } from '@/database/local/db';
 import { supabase } from '@/database/remote/supabaseClient';
+import { isOnline, isTransientNetworkError } from '@/utils/connectivity';
 import { syncTableConfig, type SyncableTable } from './syncTableConfig';
 
 // Types
@@ -29,6 +30,9 @@ const PULL_ORDER: SyncableTable[] = ['Patient', 'MemoryAsset', 'Encouragement', 
 const PATIENT_SCOPED_PULL_ORDER: SyncableTable[] = ['MemoryAsset', 'Encouragement'];
 
 const EPOCH = '1970-01-01T00:00:00.000Z';
+
+// Tracks whether sync is currently stalled on connectivity, so an offline episode logs one line on the way in and one on the way out instead of a fresh line per queued row per 30s cycle.
+let pausedForNetwork = false;
 
 // Identifies the rows one pull is allowed to see. Patient is scoped by caregiver_id on a caregiver device and by patient_id on a patient device; every child table is scoped by patient_id.
 interface PullScope {
@@ -104,7 +108,9 @@ async function pushRow(row: SyncLogRow): Promise<string | null> {
                 .delete()
                 .eq(remotePk, row.row_id);
             if (error) {
-                console.error(`[SyncService] DELETE error on ${row.table_name}:`, error.message, error);
+                if (!isTransientNetworkError(error.message)) {
+                    console.error(`[SyncService] DELETE error on ${row.table_name}:`, error.message, error);
+                }
                 return error.message;
             }
             return null;
@@ -123,7 +129,9 @@ async function pushRow(row: SyncLogRow): Promise<string | null> {
             .upsert(supabaseRow, { onConflict: remotePk });
 
         if (error) {
-            console.error(`[SyncService] UPSERT error on ${row.table_name} (${row.row_id}):`, error.message, error);
+            if (!isTransientNetworkError(error.message)) {
+                console.error(`[SyncService] UPSERT error on ${row.table_name} (${row.row_id}):`, error.message, error);
+            }
             return error.message;
         }
 
@@ -131,7 +139,9 @@ async function pushRow(row: SyncLogRow): Promise<string | null> {
         return null;
     } catch (e) {
         const msg = e instanceof Error ? e.message : 'Unknown sync error';
-        console.error(`[SyncService] Exception pushing ${row.table_name}:`, msg, e);
+        if (!isTransientNetworkError(msg)) {
+            console.error(`[SyncService] Exception pushing ${row.table_name}:`, msg, e);
+        }
         return msg;
     }
 }
@@ -247,6 +257,19 @@ async function pullTable(
     return { pulled, skipped };
 }
 
+// Logs the offline transition once per episode. Without this the 30s poll plus the handful of screens that drain on refresh would each re-log the same failure, which in dev keeps re-raising a LogBox entry the moment it is dismissed.
+function reportPaused(queued: number): void {
+    if (pausedForNetwork) return;
+    pausedForNetwork = true;
+    console.log(`[SyncService] Offline — push paused with ${queued} change(s) queued. They will be retried automatically.`);
+}
+
+function reportResumed(): void {
+    if (!pausedForNetwork) return;
+    pausedForNetwork = false;
+    console.log('[SyncService] Back online — resuming push of queued changes.');
+}
+
 // Public API
 async function drainQueue(): Promise<SyncSummary> {
     // The local SQLite database may not have finished initializing yet (e.g. a reconnect event fires before DatabaseProvider has mounted). Treat this as "nothing to sync yet" rather than throwing.
@@ -256,27 +279,46 @@ async function drainQueue(): Promise<SyncSummary> {
 
     const pendingRows = await getPendingSyncRows();
 
+    // Nothing here can succeed without a connection, and every attempt would be a doomed request. The queue is durable, so leaving the rows pending costs nothing and the next cycle picks them up.
+    if (pendingRows.length > 0 && !isOnline()) {
+        reportPaused(pendingRows.length);
+        return { attempted: 0, succeeded: 0, failed: 0 };
+    }
+
+    let attempted = 0;
     let succeeded = 0;
     let failed = 0;
+    let hitTransient = false;
 
     for (const row of pendingRows) {
+        attempted++;
         const errorMessage = await pushRow(row);
 
         if (errorMessage) {
             await markFailed(row.sync_id, errorMessage);
             failed++;
+
+            // The connection dropped mid-cycle. Every remaining row would fail identically, so stop rather than firing one more doomed request per queued change; they stay pending for the next cycle.
+            if (isTransientNetworkError(errorMessage)) {
+                hitTransient = true;
+                reportPaused(pendingRows.length - succeeded);
+                break;
+            }
         } else {
             await markSynced(row.sync_id);
             succeeded++;
         }
     }
 
-    return { attempted: pendingRows.length, succeeded, failed };
+    // Clears the paused state on the first clean cycle, including an empty one — otherwise an episode that ends while the queue happens to be empty would leave it latched and swallow the next pause log.
+    if (!hitTransient && isOnline()) reportResumed();
+
+    return { attempted, succeeded, failed };
 }
 
 // Pulls all pullable tables for one patient into local SQLite. This is the patient-device entry point. Safe to call alongside drainQueue; run push first, then pull.
 async function pullAll(patientId: string): Promise<PullSummary> {
-    if (!isDatabaseReady()) {
+    if (!isDatabaseReady() || !isOnline()) {
         return { pulled: 0, skipped: 0 };
     }
 
@@ -294,7 +336,7 @@ async function pullAll(patientId: string): Promise<PullSummary> {
 
 // Pulls everything a caregiver device needs. Patient is fetched by caregiver_id because on a fresh device there is no local Patient row to derive a patient_id from; only once those land can the per-patient children be scoped. Without this, a caregiver device pushed its queue up and never pulled anything back down.
 async function pullAllForCaregiver(caregiverId: string): Promise<PullSummary> {
-    if (!isDatabaseReady()) {
+    if (!isDatabaseReady() || !isOnline()) {
         return { pulled: 0, skipped: 0 };
     }
 

@@ -10,10 +10,61 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
+      admin_audit_log: {
+        Row: {
+          action: string
+          actor_user_id: string
+          created_at: string
+          details: Json
+          id: number
+          succeeded: boolean
+          target_id: string | null
+          target_type: string
+        }
+        Insert: {
+          action: string
+          actor_user_id: string
+          created_at?: string
+          details?: Json
+          id?: number
+          succeeded?: boolean
+          target_id?: string | null
+          target_type: string
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string
+          created_at?: string
+          details?: Json
+          id?: number
+          succeeded?: boolean
+          target_id?: string | null
+          target_type?: string
+        }
+        Relationships: []
+      }
+      admin_users: {
+        Row: {
+          created_at: string
+          note: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          note?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          note?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       Caregiver: {
         Row: {
           caregiver_contact: string
@@ -44,6 +95,114 @@ export type Database = {
         }
         Relationships: []
       }
+      caregiver_note: {
+        Row: {
+          author_user_id: string
+          body: string
+          caregiver_id: string
+          created_at: string
+          note_id: string
+        }
+        Insert: {
+          author_user_id: string
+          body: string
+          caregiver_id: string
+          created_at?: string
+          note_id?: string
+        }
+        Update: {
+          author_user_id?: string
+          body?: string
+          caregiver_id?: string
+          created_at?: string
+          note_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "caregiver_note_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "admin_caregiver_overview"
+            referencedColumns: ["caregiver_id"]
+          },
+          {
+            foreignKeyName: "caregiver_note_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "Caregiver"
+            referencedColumns: ["caregiver_id"]
+          },
+        ]
+      }
+      caregiver_tag: {
+        Row: {
+          caregiver_id: string
+          created_at: string
+          created_by: string
+          tag: string
+        }
+        Insert: {
+          caregiver_id: string
+          created_at?: string
+          created_by: string
+          tag: string
+        }
+        Update: {
+          caregiver_id?: string
+          created_at?: string
+          created_by?: string
+          tag?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "caregiver_tag_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "admin_caregiver_overview"
+            referencedColumns: ["caregiver_id"]
+          },
+          {
+            foreignKeyName: "caregiver_tag_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "Caregiver"
+            referencedColumns: ["caregiver_id"]
+          },
+        ]
+      }
+      CaregiverPushToken: {
+        Row: {
+          caregiver_id: string
+          push_token: string
+          updated_at: string | null
+        }
+        Insert: {
+          caregiver_id: string
+          push_token: string
+          updated_at?: string | null
+        }
+        Update: {
+          caregiver_id?: string
+          push_token?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "CaregiverPushToken_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: true
+            referencedRelation: "admin_caregiver_overview"
+            referencedColumns: ["caregiver_id"]
+          },
+          {
+            foreignKeyName: "CaregiverPushToken_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: true
+            referencedRelation: "Caregiver"
+            referencedColumns: ["caregiver_id"]
+          },
+        ]
+      }
       CognitiveReport: {
         Row: {
           generated_date: string
@@ -68,6 +227,13 @@ export type Database = {
             foreignKeyName: "CognitiveReport_patient_id_fkey"
             columns: ["patient_id"]
             isOneToOne: false
+            referencedRelation: "admin_patient_overview"
+            referencedColumns: ["patient_id"]
+          },
+          {
+            foreignKeyName: "CognitiveReport_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
             referencedRelation: "Patient"
             referencedColumns: ["patient_id"]
           },
@@ -78,12 +244,12 @@ export type Database = {
           ack_status: string
           ack_time: string | null
           asset_id: string | null
+          ctxalert_desc: string | null
           ctxalert_id: string
           ctxalert_msg: string
-          ctxalert_desc: string | null
-          ctxalert_type: string | null
           ctxalert_status: string
           ctxalert_time: string
+          ctxalert_type: string | null
           frequency: string
           patient_id: string
         }
@@ -91,12 +257,12 @@ export type Database = {
           ack_status: string
           ack_time?: string | null
           asset_id?: string | null
+          ctxalert_desc?: string | null
           ctxalert_id?: string
           ctxalert_msg: string
-          ctxalert_desc?: string | null
-          ctxalert_type?: string | null
           ctxalert_status: string
           ctxalert_time?: string
+          ctxalert_type?: string | null
           frequency: string
           patient_id: string
         }
@@ -104,12 +270,12 @@ export type Database = {
           ack_status?: string
           ack_time?: string | null
           asset_id?: string | null
+          ctxalert_desc?: string | null
           ctxalert_id?: string
           ctxalert_msg?: string
-          ctxalert_desc?: string | null
-          ctxalert_type?: string | null
           ctxalert_status?: string
           ctxalert_time?: string
+          ctxalert_type?: string | null
           frequency?: string
           patient_id?: string
         }
@@ -120,6 +286,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "MemoryAsset"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "ContextAlert_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "admin_patient_overview"
+            referencedColumns: ["patient_id"]
           },
           {
             foreignKeyName: "ContextAlert_patient_id_fkey"
@@ -170,6 +343,13 @@ export type Database = {
             foreignKeyName: "DailyReviewEntry_patient_id_fkey"
             columns: ["patient_id"]
             isOneToOne: false
+            referencedRelation: "admin_patient_overview"
+            referencedColumns: ["patient_id"]
+          },
+          {
+            foreignKeyName: "DailyReviewEntry_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
             referencedRelation: "Patient"
             referencedColumns: ["patient_id"]
           },
@@ -211,8 +391,22 @@ export type Database = {
             foreignKeyName: "DevicePairing_caregiver_id_fkey"
             columns: ["caregiver_id"]
             isOneToOne: false
+            referencedRelation: "admin_caregiver_overview"
+            referencedColumns: ["caregiver_id"]
+          },
+          {
+            foreignKeyName: "DevicePairing_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
             referencedRelation: "Caregiver"
             referencedColumns: ["caregiver_id"]
+          },
+          {
+            foreignKeyName: "DevicePairing_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "admin_patient_overview"
+            referencedColumns: ["patient_id"]
           },
           {
             foreignKeyName: "DevicePairing_patient_id_fkey"
@@ -259,8 +453,22 @@ export type Database = {
             foreignKeyName: "Encouragement_caregiver_id_fkey"
             columns: ["caregiver_id"]
             isOneToOne: false
+            referencedRelation: "admin_caregiver_overview"
+            referencedColumns: ["caregiver_id"]
+          },
+          {
+            foreignKeyName: "Encouragement_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
             referencedRelation: "Caregiver"
             referencedColumns: ["caregiver_id"]
+          },
+          {
+            foreignKeyName: "Encouragement_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "admin_patient_overview"
+            referencedColumns: ["patient_id"]
           },
           {
             foreignKeyName: "Encouragement_patient_id_fkey"
@@ -297,6 +505,13 @@ export type Database = {
           radius_meters?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "Geofence_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "admin_patient_overview"
+            referencedColumns: ["patient_id"]
+          },
           {
             foreignKeyName: "Geofence_patient_id_fkey"
             columns: ["patient_id"]
@@ -343,11 +558,13 @@ export type Database = {
           current_interval_minutes: number
           date_of_birth: string | null
           embedding: string
+          embedding_model: string | null
           image_url: string
           name: string
           next_review: string
           notes: string
           patient_id: string
+          paused_from: string | null
           photo_urls: Json | null
           relationship: string | null
           reminder_text: string | null
@@ -363,11 +580,13 @@ export type Database = {
           current_interval_minutes?: number
           date_of_birth?: string | null
           embedding: string
+          embedding_model?: string | null
           image_url: string
           name: string
           next_review: string
           notes: string
           patient_id: string
+          paused_from?: string | null
           photo_urls?: Json | null
           relationship?: string | null
           reminder_text?: string | null
@@ -383,11 +602,13 @@ export type Database = {
           current_interval_minutes?: number
           date_of_birth?: string | null
           embedding?: string
+          embedding_model?: string | null
           image_url?: string
           name?: string
           next_review?: string
           notes?: string
           patient_id?: string
+          paused_from?: string | null
           photo_urls?: Json | null
           relationship?: string | null
           reminder_text?: string | null
@@ -401,39 +622,11 @@ export type Database = {
             foreignKeyName: "MemoryAsset_patient_id_fkey"
             columns: ["patient_id"]
             isOneToOne: false
-            referencedRelation: "Patient"
+            referencedRelation: "admin_patient_overview"
             referencedColumns: ["patient_id"]
           },
-        ]
-      }
-      PatientLocation: {
-        Row: {
-          location_id: string
-          patient_id: string
-          latitude: number
-          longitude: number
-          accuracy: number | null
-          recorded_at: string
-        }
-        Insert: {
-          location_id?: string
-          patient_id: string
-          latitude: number
-          longitude: number
-          accuracy?: number | null
-          recorded_at?: string
-        }
-        Update: {
-          location_id?: string
-          patient_id?: string
-          latitude?: number
-          longitude?: number
-          accuracy?: number | null
-          recorded_at?: string
-        }
-        Relationships: [
           {
-            foreignKeyName: "PatientLocation_patient_id_fkey"
+            foreignKeyName: "MemoryAsset_patient_id_fkey"
             columns: ["patient_id"]
             isOneToOne: false
             referencedRelation: "Patient"
@@ -443,6 +636,7 @@ export type Database = {
       }
       Patient: {
         Row: {
+          auth_user_id: string | null
           caregiver_id: string
           created_at: string
           date_of_birth: string
@@ -454,6 +648,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          auth_user_id?: string | null
           caregiver_id: string
           created_at?: string
           date_of_birth: string
@@ -465,6 +660,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          auth_user_id?: string | null
           caregiver_id?: string
           created_at?: string
           date_of_birth?: string
@@ -480,8 +676,57 @@ export type Database = {
             foreignKeyName: "Patient_caregiver_id_fkey"
             columns: ["caregiver_id"]
             isOneToOne: false
+            referencedRelation: "admin_caregiver_overview"
+            referencedColumns: ["caregiver_id"]
+          },
+          {
+            foreignKeyName: "Patient_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
             referencedRelation: "Caregiver"
             referencedColumns: ["caregiver_id"]
+          },
+        ]
+      }
+      PatientLocation: {
+        Row: {
+          accuracy: number | null
+          latitude: number
+          location_id: string
+          longitude: number
+          patient_id: string
+          recorded_at: string
+        }
+        Insert: {
+          accuracy?: number | null
+          latitude: number
+          location_id?: string
+          longitude: number
+          patient_id: string
+          recorded_at?: string
+        }
+        Update: {
+          accuracy?: number | null
+          latitude?: number
+          location_id?: string
+          longitude?: number
+          patient_id?: string
+          recorded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patientlocation_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "admin_patient_overview"
+            referencedColumns: ["patient_id"]
+          },
+          {
+            foreignKeyName: "patientlocation_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "Patient"
+            referencedColumns: ["patient_id"]
           },
         ]
       }
@@ -519,8 +764,147 @@ export type Database = {
             foreignKeyName: "RecognitionEvent_patient_id_fkey"
             columns: ["patient_id"]
             isOneToOne: false
+            referencedRelation: "admin_patient_overview"
+            referencedColumns: ["patient_id"]
+          },
+          {
+            foreignKeyName: "RecognitionEvent_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
             referencedRelation: "Patient"
             referencedColumns: ["patient_id"]
+          },
+        ]
+      }
+      support_ticket_admin_state: {
+        Row: {
+          admin_last_read_at: string | null
+          assigned_to: string | null
+          ticket_id: string
+        }
+        Insert: {
+          admin_last_read_at?: string | null
+          assigned_to?: string | null
+          ticket_id: string
+        }
+        Update: {
+          admin_last_read_at?: string | null
+          assigned_to?: string | null
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_ticket_admin_state_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: true
+            referencedRelation: "admin_support_overview"
+            referencedColumns: ["ticket_id"]
+          },
+          {
+            foreignKeyName: "support_ticket_admin_state_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: true
+            referencedRelation: "SupportTicket"
+            referencedColumns: ["ticket_id"]
+          },
+        ]
+      }
+      SupportMessage: {
+        Row: {
+          author_role: string
+          author_user_id: string
+          body: string
+          created_at: string
+          message_id: string
+          ticket_id: string
+        }
+        Insert: {
+          author_role: string
+          author_user_id: string
+          body: string
+          created_at?: string
+          message_id?: string
+          ticket_id: string
+        }
+        Update: {
+          author_role?: string
+          author_user_id?: string
+          body?: string
+          created_at?: string
+          message_id?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "SupportMessage_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "admin_support_overview"
+            referencedColumns: ["ticket_id"]
+          },
+          {
+            foreignKeyName: "SupportMessage_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "SupportTicket"
+            referencedColumns: ["ticket_id"]
+          },
+        ]
+      }
+      SupportTicket: {
+        Row: {
+          caregiver_id: string
+          caregiver_last_read_at: string | null
+          created_at: string
+          diagnostics: Json
+          last_message_at: string
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          subject: string
+          ticket_id: string
+          updated_at: string
+        }
+        Insert: {
+          caregiver_id: string
+          caregiver_last_read_at?: string | null
+          created_at?: string
+          diagnostics?: Json
+          last_message_at?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          subject: string
+          ticket_id?: string
+          updated_at?: string
+        }
+        Update: {
+          caregiver_id?: string
+          caregiver_last_read_at?: string | null
+          created_at?: string
+          diagnostics?: Json
+          last_message_at?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          subject?: string
+          ticket_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "SupportTicket_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "admin_caregiver_overview"
+            referencedColumns: ["caregiver_id"]
+          },
+          {
+            foreignKeyName: "SupportTicket_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "Caregiver"
+            referencedColumns: ["caregiver_id"]
           },
         ]
       }
@@ -556,6 +940,13 @@ export type Database = {
           threat_type?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "Threat_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "admin_patient_overview"
+            referencedColumns: ["patient_id"]
+          },
           {
             foreignKeyName: "Threat_patient_id_fkey"
             columns: ["patient_id"]
@@ -602,10 +993,241 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      admin_asset_stats: {
+        Row: {
+          active_pool_size: number | null
+          caregiver_id: string | null
+          maintenance_count: number | null
+          missing_embedding_count: number | null
+          object_count: number | null
+          onboarding_count: number | null
+          patient_id: string | null
+          patient_name: string | null
+          paused_count: number | null
+          person_count: number | null
+          pool_utilisation_pct: number | null
+          total_assets: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "MemoryAsset_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "admin_patient_overview"
+            referencedColumns: ["patient_id"]
+          },
+          {
+            foreignKeyName: "MemoryAsset_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "Patient"
+            referencedColumns: ["patient_id"]
+          },
+          {
+            foreignKeyName: "Patient_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "admin_caregiver_overview"
+            referencedColumns: ["caregiver_id"]
+          },
+          {
+            foreignKeyName: "Patient_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "Caregiver"
+            referencedColumns: ["caregiver_id"]
+          },
+        ]
+      }
+      admin_caregiver_overview: {
+        Row: {
+          asset_count: number | null
+          caregiver_contact: string | null
+          caregiver_id: string | null
+          created_at: string | null
+          email: string | null
+          full_name: string | null
+          image_url: string | null
+          last_session_at: string | null
+          open_ticket_count: number | null
+          paired_patient_count: number | null
+          patient_count: number | null
+          session_count: number | null
+        }
+        Relationships: []
+      }
+      admin_embedding_model_mix: {
+        Row: {
+          asset_count: number | null
+          embedding_model: string | null
+          type: string | null
+        }
+        Relationships: []
+      }
+      admin_growth_daily: {
+        Row: {
+          active_patients: number | null
+          day: string | null
+          new_caregivers: number | null
+          new_patients: number | null
+          recognitions: number | null
+          sessions: number | null
+        }
+        Relationships: []
+      }
+      admin_incident_feed: {
+        Row: {
+          ack_latency_seconds: number | null
+          acknowledged_at: string | null
+          kind: string | null
+          message: string | null
+          occurred_at: string | null
+          patient_id: string | null
+          source_id: string | null
+          status: string | null
+          subtype: string | null
+        }
+        Relationships: []
+      }
+      admin_kpi: {
+        Row: {
+          assets: number | null
+          caregivers: number | null
+          open_context_alerts: number | null
+          open_threats: number | null
+          paired_patients: number | null
+          patients: number | null
+          recognitions: number | null
+          reports_generated: number | null
+          sessions: number | null
+        }
+        Relationships: []
+      }
+      admin_pairing_funnel: {
+        Row: {
+          expired_unused: number | null
+          issued: number | null
+          pending: number | null
+          used: number | null
+        }
+        Relationships: []
+      }
+      admin_patient_daily: {
+        Row: {
+          accuracy: number | null
+          correct: number | null
+          day: string | null
+          median_latency_ms: number | null
+          patient_id: string | null
+          sessions: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "MemoryAsset_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "admin_patient_overview"
+            referencedColumns: ["patient_id"]
+          },
+          {
+            foreignKeyName: "MemoryAsset_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "Patient"
+            referencedColumns: ["patient_id"]
+          },
+        ]
+      }
+      admin_patient_overview: {
+        Row: {
+          asset_count: number | null
+          auth_user_id: string | null
+          caregiver_email: string | null
+          caregiver_id: string | null
+          caregiver_name: string | null
+          completed_30d: number | null
+          created_at: string | null
+          date_of_birth: string | null
+          image_url: string | null
+          is_paired: boolean | null
+          last_active_day: string | null
+          last_session_at: string | null
+          maintenance_count: number | null
+          onboarding_count: number | null
+          open_threats: number | null
+          patient_id: string | null
+          patient_name: string | null
+          paused_count: number | null
+          queued_30d: number | null
+          sessions_correct: number | null
+          sessions_total: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "Patient_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "admin_caregiver_overview"
+            referencedColumns: ["caregiver_id"]
+          },
+          {
+            foreignKeyName: "Patient_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "Caregiver"
+            referencedColumns: ["caregiver_id"]
+          },
+        ]
+      }
+      admin_support_overview: {
+        Row: {
+          admin_last_read_at: string | null
+          assigned_to: string | null
+          caregiver_email: string | null
+          caregiver_id: string | null
+          caregiver_name: string | null
+          created_at: string | null
+          diagnostics: Json | null
+          has_unread: boolean | null
+          last_author_role: string | null
+          last_message_at: string | null
+          message_count: number | null
+          resolved_at: string | null
+          status: string | null
+          subject: string | null
+          ticket_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "SupportTicket_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "admin_caregiver_overview"
+            referencedColumns: ["caregiver_id"]
+          },
+          {
+            foreignKeyName: "SupportTicket_caregiver_id_fkey"
+            columns: ["caregiver_id"]
+            isOneToOne: false
+            referencedRelation: "Caregiver"
+            referencedColumns: ["caregiver_id"]
+          },
+        ]
+      }
     }
     Functions: {
-      [_ in never]: never
+      admin_auth_user_status: {
+        Args: never
+        Returns: {
+          banned_until: string
+          created_at: string
+          email: string
+          email_confirmed_at: string
+          last_sign_in_at: string
+          user_id: string
+        }[]
+      }
+      is_admin: { Args: never; Returns: boolean }
     }
     Enums: {
       [_ in never]: never

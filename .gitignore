@@ -46,6 +46,11 @@ app-example
 # supabase
 supabase/.temp/
 
+# admin dashboard (separate Vite app)
+admin/node_modules/
+admin/dist/
+admin/tsconfig.tsbuildinfo
+
 # claude
 CLAUDE.md
 .mcp.json
