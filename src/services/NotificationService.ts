@@ -52,11 +52,10 @@ async function registerForPushNotifications(): Promise<string | null> {
     return token;
 }
 
-// Saves the caregiver's push token to Supabase so the patient can look it up
-// Note: Requires a table `CaregiverPushToken` with columns `caregiver_id`, `push_token`, `updated_at`
+// Saves the caregiver's push token to Supabase so their paired patient's device can look it up
 async function savePushTokenForCaregiver(caregiverId: string, token: string): Promise<void> {
     const { error } = await supabase
-        .from('CaregiverPushToken' as any)
+        .from('CaregiverPushToken')
         .upsert({ caregiver_id: caregiverId, push_token: token, updated_at: new Date().toISOString() });
     
     if (error) {
@@ -68,7 +67,7 @@ async function savePushTokenForCaregiver(caregiverId: string, token: string): Pr
 async function getPushTokenForCaregiver(caregiverId: string): Promise<string | null> {
     console.log(`[NotificationService] Looking up push token for caregiver: ${caregiverId}`);
     const { data, error } = await supabase
-        .from('CaregiverPushToken' as any)
+        .from('CaregiverPushToken')
         .select('push_token')
         .eq('caregiver_id', caregiverId)
         .single();
@@ -77,7 +76,7 @@ async function getPushTokenForCaregiver(caregiverId: string): Promise<string | n
         console.error('[NotificationService] Error fetching push token:', error);
     }
     
-    const token = (data as any)?.push_token;
+    const token = data?.push_token;
     console.log('[NotificationService] Found push token:', token);
     return token ?? null;
 }
@@ -205,7 +204,22 @@ async function cancelDailyReviewReminder(): Promise<void> {
     await Notifications.cancelScheduledNotificationAsync(DAILY_REVIEW_ID).catch(() => {});
 }
 
+
+// Routes a tapped notification to the screen named in its data.url payload.
+// Both existing notification paths already set data.url, but nothing consumed it until now, so this
+// makes the emergency and daily-review deep links work too, not just support replies.
+function addNotificationTapHandler(navigate: (url: string) => void): () => void {
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+        const url = response.notification.request.content.data?.url;
+        if (typeof url === 'string' && url.startsWith('/')) {
+            navigate(url);
+        }
+    });
+    return () => subscription.remove();
+}
+
 export const NotificationService = {
+    addNotificationTapHandler,
     registerForPushNotifications,
     savePushTokenForCaregiver,
     getPushTokenForCaregiver,
