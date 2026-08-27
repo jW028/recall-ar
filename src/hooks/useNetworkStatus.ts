@@ -2,6 +2,7 @@ import { isDatabaseReady } from '@/database/local/db';
 import { AuthService } from '@/services/AuthService';
 import { PairingService } from '@/services/PairingService';
 import { SyncService } from '@/services/SyncService';
+import { isOnline as isDeviceOnline } from '@/utils/connectivity';
 import NetInfo from '@react-native-community/netinfo';
 import { useEffect, useRef, useState } from 'react';
 
@@ -53,6 +54,9 @@ export function useNetworkStatus(): UseNetworkStatus {
   const wasOnlineRef = useRef(true);
 
   useEffect(() => {
+    // Warms the shared connectivity cache that the services check before firing a request. It subscribes lazily, so without this its first reader gets the optimistic default instead of the real state.
+    isDeviceOnline();
+
     const unsubscribe = NetInfo.addEventListener((state) => {
       const nowOnline = Boolean(state.isConnected && state.isInternetReachable);
 
