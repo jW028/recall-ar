@@ -16,12 +16,13 @@ import { MIGRATION_V7_ASSET_PAUSE } from './migrations/v7_asset_pause';
 import { MIGRATION_V8_EMBEDDING_MODEL } from './migrations/v8_embedding_model';
 import { MIGRATION_V9_RECOGNITION_EVENT } from './migrations/v9_recognition_event';
 import { MIGRATION_V14_CAREGIVER_PROFILE_PICTURE } from './migrations/v14_caregiver_profile_picture';
+import { MIGRATION_V15_CONTEXT_ALERT_NULLABLE_SCHEDULE } from './migrations/v15_context_alert_nullable_schedule';
 import { CREATE_TABLES } from './schema';
 
 const DATABASE_NAME = 'recallar.db';
 
 // Bump this number when a new migration is added in the MIGRATIONS array
-const LATEST_VERSION = 14;
+const LATEST_VERSION = 15;
 
 
 interface Migration {
@@ -101,6 +102,11 @@ const MIGRATIONS: Migration[] = [
         description: 'Add image_url profile picture column to Caregiver',
         sql: MIGRATION_V14_CAREGIVER_PROFILE_PICTURE,
     },
+    {
+        version: 15,
+        description: 'Allow nullable ctxAlert_time and frequency in ContextAlert',
+        sql: MIGRATION_V15_CONTEXT_ALERT_NULLABLE_SCHEDULE,
+    },
 ];
 
 async function safeAddColumn(db: SQLiteDatabase, table: string, column: string, columnDef: string): Promise<void> {
@@ -115,6 +121,63 @@ async function safeAddColumn(db: SQLiteDatabase, table: string, column: string, 
             return;
         }
         throw e;
+    }
+}
+
+async function ensureContextAlertNullable(db: SQLiteDatabase): Promise<void> {
+    try {
+        const cols = await db.getAllAsync<{ name: string; notnull: number }>('PRAGMA table_info(ContextAlert)');
+        if (cols.length === 0) return;
+
+        const timeCol = cols.find((c) => c.name.toLowerCase() === 'ctxalert_time');
+        const freqCol = cols.find((c) => c.name.toLowerCase() === 'frequency');
+
+        if (timeCol?.notnull === 1 || freqCol?.notnull === 1) {
+            console.log('[DB] Migrating ContextAlert schema to allow nullable time and frequency');
+            const hasDesc = cols.some((c) => c.name.toLowerCase() === 'ctxalert_desc');
+            const hasType = cols.some((c) => c.name.toLowerCase() === 'ctxalert_type');
+            const descExpr = hasDesc ? 'ctxAlert_desc' : 'NULL';
+            const typeExpr = hasType ? "COALESCE(ctxAlert_type, 'Reminder')" : "'Reminder'";
+
+            await db.execAsync(`
+                CREATE TABLE IF NOT EXISTS ContextAlert_new (
+                    ctxAlert_id       TEXT PRIMARY KEY NOT NULL,
+                    patient_id        TEXT NOT NULL,
+                    asset_id          TEXT,
+                    ctxAlert_msg      TEXT NOT NULL,
+                    ctxAlert_desc     TEXT,
+                    ctxAlert_type     TEXT NOT NULL DEFAULT 'Reminder',
+                    ctxAlert_status   TEXT NOT NULL,
+                    ctxAlert_time     TEXT,
+                    ack_time          TEXT,
+                    ack_status        TEXT NOT NULL,
+                    frequency         TEXT,
+                    FOREIGN KEY (patient_id) REFERENCES Patient(patient_id) ON DELETE CASCADE,
+                    FOREIGN KEY (asset_id)   REFERENCES MemoryAsset(asset_id) ON DELETE SET NULL
+                );
+
+                INSERT OR IGNORE INTO ContextAlert_new
+                    (ctxAlert_id, patient_id, asset_id, ctxAlert_msg, ctxAlert_desc, ctxAlert_type, ctxAlert_status, ctxAlert_time, ack_time, ack_status, frequency)
+                SELECT
+                    ctxAlert_id,
+                    patient_id,
+                    asset_id,
+                    ctxAlert_msg,
+                    ${descExpr},
+                    ${typeExpr},
+                    ctxAlert_status,
+                    ctxAlert_time,
+                    ack_time,
+                    ack_status,
+                    frequency
+                FROM ContextAlert;
+
+                DROP TABLE ContextAlert;
+                ALTER TABLE ContextAlert_new RENAME TO ContextAlert;
+            `);
+        }
+    } catch (e) {
+        console.warn('[DB] Failed to ensure ContextAlert nullable schema:', e);
     }
 }
 
@@ -136,6 +199,8 @@ async function runMigrations(db: SQLiteDatabase): Promise<void> {
                 if (migration.version === 13) {
                     await safeAddColumn(db, 'ContextAlert', 'ctxAlert_desc', 'TEXT');
                     await safeAddColumn(db, 'ContextAlert', 'ctxAlert_type', "TEXT NOT NULL DEFAULT 'Reminder'");
+                } else if (migration.version === 15) {
+                    await ensureContextAlertNullable(db);
                 } else {
                     await db.execAsync(migration.sql);
                 }
@@ -176,6 +241,7 @@ async function ensureColumns(db: SQLiteDatabase): Promise<void> {
     await safeAddColumn(db, 'Patient', 'image_url', 'TEXT');
     await safeAddColumn(db, 'ContextAlert', 'ctxAlert_desc', 'TEXT');
     await safeAddColumn(db, 'ContextAlert', 'ctxAlert_type', "TEXT NOT NULL DEFAULT 'Reminder'");
+    await ensureContextAlertNullable(db);
 }
 
 // onInit entry point: run versioned migrations, then reconcile any column drift.

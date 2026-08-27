@@ -153,11 +153,13 @@ export const CREATE_TABLES = `
         patient_id        TEXT NOT NULL,
         asset_id          TEXT,                            -- nullable (alert may not relate to an asset)
         ctxAlert_msg      TEXT NOT NULL,
+        ctxAlert_desc     TEXT,                            -- nullable
+        ctxAlert_type     TEXT NOT NULL DEFAULT 'Reminder',
         ctxAlert_status   TEXT NOT NULL,
-        ctxAlert_time     TEXT NOT NULL DEFAULT (datetime('now')), -- [5] NOT NULL
+        ctxAlert_time     TEXT,                            -- nullable — null for anytime / object-only alerts
         ack_time          TEXT,                            -- nullable — may not be acknowledged
         ack_status        TEXT NOT NULL,
-        frequency         TEXT NOT NULL,
+        frequency         TEXT,                            -- nullable for unscheduled alerts
         FOREIGN KEY (patient_id) REFERENCES Patient(patient_id) ON DELETE CASCADE,
         FOREIGN KEY (asset_id)   REFERENCES MemoryAsset(asset_id) ON DELETE SET NULL
     );
