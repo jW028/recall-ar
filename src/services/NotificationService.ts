@@ -29,6 +29,15 @@ async function registerForPushNotifications(): Promise<string | null> {
         sound: 'default',
     });
 
+    // Support replies get their own channel at DEFAULT importance. Reusing emergency-alerts would put
+    // a helpdesk answer through a MAX-priority red-light vibration meant for panic buttons and falls,
+    // and would let a caregiver silencing support also silence emergencies.
+    await Notifications.setNotificationChannelAsync('support', {
+        name: 'Support replies',
+        importance: Notifications.AndroidImportance.DEFAULT,
+        sound: 'default',
+    });
+
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
 

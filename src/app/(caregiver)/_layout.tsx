@@ -6,7 +6,7 @@ import { useAuthStore } from '@/store/authStore';
 import { NotificationService } from '@/services/NotificationService';
 import { Ionicons } from '@expo/vector-icons';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { useSegments } from 'expo-router';
+import { useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
 
 // Caregiver app defaults to light with an optional dark mode (persisted preference)
@@ -14,6 +14,7 @@ export default function CaregiverLayout() {
     const mode = useThemeStore((s) => s.mode);
     const user = useAuthStore((s) => s.user);
     const segments = useSegments();
+    const router = useRouter();
 
     // Only the root of each tab swipes, so the gesture never fights a detail screen's back swipe
     const swipeEnabled = segments.length <= 2;
@@ -37,6 +38,13 @@ export default function CaregiverLayout() {
 
         setupPushNotifications(userId);
     }, [user?.id]);
+
+    // Tapping a push should land on the thing it is about — a support reply opens that ticket.
+    useEffect(() => {
+        return NotificationService.addNotificationTapHandler((url) => {
+            router.push(url as Parameters<typeof router.push>[0]);
+        });
+    }, [router]);
 
     return (
         <ThemeSchemeContext.Provider value={mode}>
