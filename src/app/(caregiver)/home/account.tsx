@@ -71,6 +71,14 @@ export default function AccountScreen() {
                     </View>
                 </View>
 
+                <Text style={styles.sectionLabel}>Support</Text>
+                <ActionRow
+                    icon="chatbubble-ellipses-outline"
+                    label="Contact support"
+                    subtitle="Message our team and track your tickets"
+                    onPress={() => router.push('/(caregiver)/home/support')}
+                />
+
                 <Text style={styles.sectionLabel}>Help & Legal</Text>
                 <ActionRow
                     icon="shield-checkmark-outline"

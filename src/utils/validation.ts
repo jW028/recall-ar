@@ -47,4 +47,14 @@ export const validate = {
     const d = new Date(value);
     return isNaN(d.getTime()) ? 'Enter a valid date' : null;
   },
+
+  // Bounded free text. Mirrors the CHECK constraints on SupportTicket.subject and SupportMessage.body
+  // so the caregiver sees the limit inline instead of a Postgres rejection after they hit send.
+  length(value: string, min: number, max: number, label = 'This field'): FieldError {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) return `${label} is required`;
+    if (trimmed.length < min) return `${label} must be at least ${min} characters`;
+    if (trimmed.length > max) return `${label} must be ${max} characters or fewer`;
+    return null;
+  },
 };
