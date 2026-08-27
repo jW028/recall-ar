@@ -9,10 +9,10 @@ import { Accelerometer, Gyroscope } from 'expo-sensors';
 export type SensitivityLevel = 'low' | 'medium' | 'high';
 
 export const FALL_DETECTION_CONFIG = {
-    impactAccelThresholdMS2: 21.0,   // m/s² (~2.14g; requires ~1.14g motion above static gravity)
-    gyroRotationThresholdRad: 2.5,   // rad/s (~143°/s; prevents triggering on normal phone turns)
-    orientationTiltThresholdDeg: 60.0, // degrees
-    triggerWindowMs: 1500,           // 1.5-second trigger window
+    impactAccelThresholdMS2: 21.0,
+    gyroRotationThresholdRad: 2.5,
+    orientationTiltThresholdDeg: 60.0,
+    triggerWindowMs: 1500,
 };
 
 let accelSubscription: EventSubscription | null = null;

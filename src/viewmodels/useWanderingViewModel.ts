@@ -33,6 +33,8 @@ export function useWanderingViewModel(): UseWanderingViewModel {
         })();
     }, []);
 
+    const isDispatchingRef = useRef(false);
+
     const clearCountdownTimer = useCallback(() => {
         if (timerRef.current !== null) {
             clearInterval(timerRef.current);
@@ -43,6 +45,7 @@ export function useWanderingViewModel(): UseWanderingViewModel {
     const onWanderingPromptTriggered = useCallback(() => {
         setWanderingState(prev => {
             if (prev !== 'idle') return prev;
+            isDispatchingRef.current = false;
             setCountdownSeconds(WANDERING_CONFIG.countdownDurationSec);
             return 'countdown';
         });
@@ -71,12 +74,16 @@ export function useWanderingViewModel(): UseWanderingViewModel {
 
     const confirmPatientOK = useCallback(() => {
         clearCountdownTimer();
+        isDispatchingRef.current = false;
         WanderingDetectionService.snoozePromptForInterval();
         setWanderingState('idle');
         setCountdownSeconds(WANDERING_CONFIG.countdownDurationSec);
     }, [clearCountdownTimer]);
 
     const dispatchEmergency = useCallback(async () => {
+        if (isDispatchingRef.current) return;
+        isDispatchingRef.current = true;
+
         let pId = patientIdRef.current;
         let cId = caregiverIdRef.current;
 
@@ -109,7 +116,9 @@ export function useWanderingViewModel(): UseWanderingViewModel {
                     if (prev <= 1) {
                         clearCountdownTimer();
                         setWanderingState('triggered');
-                        dispatchEmergency();
+                        setTimeout(() => {
+                            dispatchEmergency();
+                        }, 0);
                         return 0;
                     }
                     return prev - 1;

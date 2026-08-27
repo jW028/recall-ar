@@ -38,6 +38,8 @@ export function useFallDetectionViewModel(): UseFallDetectionViewModel {
         })();
     }, []);
 
+    const isDispatchingRef = useRef(false);
+
     const clearCountdownTimer = useCallback(() => {
         if (timerRef.current !== null) {
             clearInterval(timerRef.current);
@@ -48,6 +50,7 @@ export function useFallDetectionViewModel(): UseFallDetectionViewModel {
     const onPotentialFallDetected = useCallback(() => {
         setFallState(prev => {
             if (prev !== 'idle') return prev;
+            isDispatchingRef.current = false;
             setCountdownSeconds(INITIAL_COUNTDOWN_SECONDS);
             return 'countdown';
         });
@@ -65,11 +68,15 @@ export function useFallDetectionViewModel(): UseFallDetectionViewModel {
 
     const cancelFallAlert = useCallback(() => {
         clearCountdownTimer();
+        isDispatchingRef.current = false;
         setFallState('idle');
         setCountdownSeconds(INITIAL_COUNTDOWN_SECONDS);
     }, [clearCountdownTimer]);
 
     const dispatchEmergency = useCallback(async () => {
+        if (isDispatchingRef.current) return;
+        isDispatchingRef.current = true;
+
         let pId = patientIdRef.current;
         let cId = caregiverIdRef.current;
 
@@ -102,7 +109,9 @@ export function useFallDetectionViewModel(): UseFallDetectionViewModel {
                     if (prev <= 1) {
                         clearCountdownTimer();
                         setFallState('triggered');
-                        dispatchEmergency();
+                        setTimeout(() => {
+                            dispatchEmergency();
+                        }, 0);
                         return 0;
                     }
                     return prev - 1;

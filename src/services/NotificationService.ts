@@ -128,17 +128,15 @@ async function sendLocalEmergencyNotification(
     }
 }
 
-// Sends an emergency push notification to the caregiver via Expo Push API + local notification
+// Sends an emergency push notification to the caregiver via Expo Push API (or fallback local notification if no token is available)
 async function sendEmergencyNotification(
     pushToken: string | null,
     alertType: EmergencyAlertType = 'Panic Button'
 ): Promise<void> {
-    // 1. Always trigger local notification as immediate feedback
-    await sendLocalEmergencyNotification(alertType);
-
-    // 2. If push token is present, send remote push notification to caregiver
+    // If no remote push token is present, trigger a local notification as a fallback
     if (!pushToken) {
-        console.warn('[NotificationService] No push token provided for remote caregiver notification');
+        console.warn('[NotificationService] No push token provided for remote caregiver notification, falling back to local alert.');
+        await sendLocalEmergencyNotification(alertType);
         return;
     }
 
