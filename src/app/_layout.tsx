@@ -18,6 +18,8 @@ function AuthGuard() {
   useEffect(() => {
     PairingService.getPersistedPairing().then(async (pairingInfo) => {
       if (pairingInfo) {
+        // A paired device whose stored Supabase session was lost still routes into the patient flow, where every sync push is rejected by RLS. Put the session back before reading it.
+        await PairingService.restoreSession();
         const currentUser = await AuthService.getCurrentUser();
         if (currentUser) {
           setUser(currentUser);
@@ -34,6 +36,9 @@ function AuthGuard() {
     });
     return unsubscribe;
   }, []);
+
+  // Mirrors each refreshed patient session into SecureStore so restoreSession above has a token that still works.
+  useEffect(() => PairingService.keepStoredSessionFresh(), []);
 
   // Route based on auth status
   useEffect(() => {

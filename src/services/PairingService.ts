@@ -172,6 +172,46 @@ async function getPersistedPairing(): Promise<PairingInfo | null> {
     }
 }
 
+// The Supabase client keeps its session in AsyncStorage, which a reinstall or a cleared dev build wipes while the SecureStore pairing survives. The device then looks paired, runs the patient flow unauthenticated, and every sync push is rejected with "new row violates row-level security policy". These are the tokens saved at pairing time, kept current by keepStoredSessionFresh.
+async function restoreSession(): Promise<boolean> {
+    const { data } = await supabase.auth.getSession();
+    if (data.session) return true;
+
+    const raw = await SecureStore.getItemAsync(SECURE_STORE_SESSION_KEY);
+    if (!raw) return false;
+
+    try {
+        const { access_token, refresh_token } = JSON.parse(raw);
+        const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+        if (error) {
+            // A refresh token that no longer works never will, so drop it rather than retrying the same failure on every boot.
+            await SecureStore.deleteItemAsync(SECURE_STORE_SESSION_KEY);
+            return false;
+        }
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+// Supabase rotates the refresh token on every refresh, which would leave the SecureStore copy stale and useless as a fallback within the hour. Re-save it whenever the client issues a new one.
+function keepStoredSessionFresh(): () => void {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event !== 'TOKEN_REFRESHED' && event !== 'SIGNED_IN') return;
+        // SECURE_STORE_SESSION_KEY is the patient device's session; a caregiver signing in on the same build must not overwrite it.
+        if (session?.user.user_metadata?.role !== 'patient') return;
+        void SecureStore.setItemAsync(
+            SECURE_STORE_SESSION_KEY,
+            JSON.stringify({
+                access_token: session.access_token,
+                refresh_token: session.refresh_token,
+            })
+        );
+    });
+
+    return () => listener.subscription.unsubscribe();
+}
+
 // Unpair device - used to reset patient device
 async function unpairDevice(): Promise<void> {
     await supabase.auth.signOut();
@@ -190,5 +230,7 @@ export const PairingService = {
     generatePairingToken,
     pairDevice,
     getPersistedPairing,
+    restoreSession,
+    keepStoredSessionFresh,
     unpairDevice,
 };

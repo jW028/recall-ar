@@ -34,6 +34,9 @@ const EPOCH = '1970-01-01T00:00:00.000Z';
 // Tracks whether sync is currently stalled on connectivity, so an offline episode logs one line on the way in and one on the way out instead of a fresh line per queued row per 30s cycle.
 let pausedForNetwork = false;
 
+// The same latch for the other reason an entire cycle is doomed before it starts: no Supabase session.
+let pausedForAuth = false;
+
 // Identifies the rows one pull is allowed to see. Patient is scoped by caregiver_id on a caregiver device and by patient_id on a patient device; every child table is scoped by patient_id.
 interface PullScope {
     column: string;
@@ -88,8 +91,14 @@ async function markFailed(syncId: string, errorMessage: string): Promise<void> {
 }
 
 
+// Every synced table is protected by row-level security policies that key off auth.uid(). With no session the client sends the publishable key, PostgREST runs the statement as `anon`, auth.uid() is null and every push is rejected with "new row violates row-level security policy".
+async function getSyncUserId(): Promise<string | null> {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.user.id ?? null;
+}
+
 // Pushes one queued change to Supabase using the config for its table
-async function pushRow(row: SyncLogRow): Promise<string | null> {
+async function pushRow(row: SyncLogRow, authUserId: string): Promise<string | null> {
     const config = syncTableConfig[row.table_name];
 
     if (!config) {
@@ -109,7 +118,7 @@ async function pushRow(row: SyncLogRow): Promise<string | null> {
                 .eq(remotePk, row.row_id);
             if (error) {
                 if (!isTransientNetworkError(error.message)) {
-                    console.error(`[SyncService] DELETE error on ${row.table_name}:`, error.message, error);
+                    console.error(`[SyncService] DELETE error on ${row.table_name} (as auth user ${authUserId}):`, error.message, error);
                 }
                 return error.message;
             }
@@ -130,7 +139,7 @@ async function pushRow(row: SyncLogRow): Promise<string | null> {
 
         if (error) {
             if (!isTransientNetworkError(error.message)) {
-                console.error(`[SyncService] UPSERT error on ${row.table_name} (${row.row_id}):`, error.message, error);
+                console.error(`[SyncService] UPSERT error on ${row.table_name} (${row.row_id}, as auth user ${authUserId}):`, error.message, error);
             }
             return error.message;
         }
@@ -270,6 +279,18 @@ function reportResumed(): void {
     console.log('[SyncService] Back online — resuming push of queued changes.');
 }
 
+function reportAuthPaused(queued: number): void {
+    if (pausedForAuth) return;
+    pausedForAuth = true;
+    console.log(`[SyncService] No Supabase session — push paused with ${queued} change(s) queued. They will be retried once this device is signed in or paired again.`);
+}
+
+function reportAuthResumed(): void {
+    if (!pausedForAuth) return;
+    pausedForAuth = false;
+    console.log('[SyncService] Session available — resuming push of queued changes.');
+}
+
 // Public API
 async function drainQueue(): Promise<SyncSummary> {
     // The local SQLite database may not have finished initializing yet (e.g. a reconnect event fires before DatabaseProvider has mounted). Treat this as "nothing to sync yet" rather than throwing.
@@ -285,6 +306,14 @@ async function drainQueue(): Promise<SyncSummary> {
         return { attempted: 0, succeeded: 0, failed: 0 };
     }
 
+    // Without a session every row would be rejected by RLS, marked failed and left pending — the same doomed request per queued row every 30s. The queue is durable, so wait for a session instead of burning the cycle.
+    const authUserId = await getSyncUserId();
+    if (!authUserId) {
+        if (pendingRows.length > 0) reportAuthPaused(pendingRows.length);
+        return { attempted: 0, succeeded: 0, failed: 0 };
+    }
+    reportAuthResumed();
+
     let attempted = 0;
     let succeeded = 0;
     let failed = 0;
@@ -292,7 +321,7 @@ async function drainQueue(): Promise<SyncSummary> {
 
     for (const row of pendingRows) {
         attempted++;
-        const errorMessage = await pushRow(row);
+        const errorMessage = await pushRow(row, authUserId);
 
         if (errorMessage) {
             await markFailed(row.sync_id, errorMessage);
