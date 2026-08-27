@@ -1,10 +1,14 @@
-import { AR_LATENCY_BUDGET_MS } from '@/constants/config';
+import {
+    AR_CONTEXT_ALERT_INTERVAL_MS,
+    AR_FRAME_INTERVAL_MS,
+} from '@/constants/config';
 import type { ContextAlert } from '@/models/ContextAlert';
 import { ContextAlertService } from '@/services/ContextAlertService';
 import { EngagementService } from '@/services/EngagementService';
 import { PairingService } from '@/services/PairingService';
 import { RecognitionService, type RecognitionResult } from '@/services/RecognitionService';
 import { useAuthStore } from '@/store/authStore';
+import { File } from 'expo-file-system';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -19,6 +23,23 @@ import {
 // capture session permanently dead — the only recovery is a stop/start, which `isActive` drives.
 const CAMERA_RECOVERY_DELAY_MS = 600;
 const MAX_CAMERA_RECOVERY_ATTEMPTS = 3;
+
+// Must be module-level. `usePhotoOutput` memoizes on this object's identity, and `<Camera outputs>` memoizes on the
+// output's identity, so an inline literal would build a new native photo output and reconfigure the capture session
+// on every single React render — which stalls the preview and is what drives iOS into a mediaserverd reset.
+const PHOTO_TARGET_RESOLUTION = { width: 480, height: 360 };
+
+// Only the fields the overlay draws. Recognition runs continuously, so re-rendering on an unchanged result would
+// re-render the Camera several times a second for nothing.
+function sameResult(a: RecognitionResult | null, b: RecognitionResult): boolean {
+    if (!a) return false;
+    return a.status === b.status && a.assetId === b.assetId && a.label === b.label;
+}
+
+function sameReminders(a: ContextAlert[], b: ContextAlert[]): boolean {
+    if (a.length !== b.length) return false;
+    return a.every((alert, i) => alert.ctxAlertId === b[i].ctxAlertId);
+}
 
 export interface ARViewModelResult {
     hasPermission: boolean;
@@ -56,7 +77,7 @@ export function useARViewModel(): ARViewModelResult {
 
     const photoOutput = usePhotoOutput({
         // Only the aspect ratio is honoured — no device offers a 480x360 still format, so this just pins 4:3.
-        targetResolution: { width: 480, height: 360 },
+        targetResolution: PHOTO_TARGET_RESOLUTION,
         qualityPrioritization: 'speed',
         // Defaults are 'native' (HEIC on iOS) at 0.9. Every frame is downscaled to <=160px and discarded, so
         // HEVC-encoding a full-resolution photo at high quality is wasted work on a 2Hz loop.
@@ -126,6 +147,9 @@ export function useARViewModel(): ARViewModelResult {
     }, []);
 
     const [contextReminders, setContextReminders] = useState<ContextAlert[]>([]);
+    // Reminders fire on a time window, so they only need re-checking on a slow tick or when the match changes
+    const lastContextEvalAtRef = useRef(0);
+    const lastDetectedAssetIdRef = useRef<string | null>(null);
 
     const acknowledgeReminder = useCallback(async (alertId: string) => {
         await ContextAlertService.acknowledgeContextAlert(alertId);
@@ -142,20 +166,38 @@ export function useARViewModel(): ARViewModelResult {
             recoveryAttemptsRef.current = 0;
 
             const frameUri = `file://${photoFile.filePath}`;
-            const recognitionResult = await RecognitionService.processFrame(frameUri);
+            let recognitionResult: RecognitionResult;
+            try {
+                recognitionResult = await RecognitionService.processFrame(frameUri);
+            } finally {
+                // capturePhotoToFile leaves the JPEG in a temp dir with no dispose() of its own
+                try {
+                    new File(frameUri).delete();
+                } catch {
+                    // Temp file; the OS reclaims it if the delete fails
+                }
+            }
 
             if (isMountedRef.current) {
-                setResult(recognitionResult);
+                setResult((prev) => (sameResult(prev, recognitionResult) ? prev : recognitionResult));
             }
+
+            const detectedAssetId =
+                recognitionResult.status === 'recognized' ? recognitionResult.assetId ?? null : null;
 
             // Evaluate contextual reminders if patient is paired
             const pId = pairedPatientIdRef.current || patientId;
-            if (pId) {
-                const detectedAssetId =
-                    recognitionResult.status === 'recognized' ? recognitionResult.assetId : null;
+            const assetChanged = detectedAssetId !== lastDetectedAssetIdRef.current;
+            const dueForEval = Date.now() - lastContextEvalAtRef.current >= AR_CONTEXT_ALERT_INTERVAL_MS;
+
+            if (pId && (assetChanged || dueForEval)) {
+                lastDetectedAssetIdRef.current = detectedAssetId;
+                lastContextEvalAtRef.current = Date.now();
+
                 const evalRes = await ContextAlertService.evaluateContextAlerts(pId, detectedAssetId);
                 if (isMountedRef.current && evalRes.data) {
-                    setContextReminders(evalRes.data);
+                    const matched = evalRes.data;
+                    setContextReminders((prev) => (sameReminders(prev, matched) ? prev : matched));
                 }
             }
 
@@ -181,8 +223,22 @@ export function useARViewModel(): ARViewModelResult {
         // Don't capture into a session that is stopped or being restarted
         if (isInitializing || initError || !hasPermission || !isCameraActive) return;
 
-        const interval = setInterval(capture, AR_LATENCY_BUDGET_MS);
-        return () => clearInterval(interval);
+        let cancelled = false;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+
+        // Chained timeouts rather than setInterval: a frame that overruns the budget would otherwise have the next
+        // capture fire the instant it finishes, holding the JS thread and the capture pipeline at full tilt.
+        const tick = async () => {
+            await capture();
+            if (cancelled) return;
+            timer = setTimeout(tick, AR_FRAME_INTERVAL_MS);
+        };
+        tick();
+
+        return () => {
+            cancelled = true;
+            if (timer) clearTimeout(timer);
+        };
     }, [isInitializing, initError, capture, hasPermission, isCameraActive]);
 
     return {

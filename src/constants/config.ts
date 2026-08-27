@@ -24,6 +24,14 @@ export const AR_LIVE_CROP_FRACTION = 0.6;
 // Processing Latency threshold
 export const AR_LATENCY_BUDGET_MS = 500;
 
+// Gap between the end of one recognition frame and the start of the next, kept separate from the latency budget.
+// The pipeline blocks the JS thread, so a gap gives React a window to render and the camera one to settle after a pan.
+export const AR_FRAME_INTERVAL_MS = 700;
+
+// How often contextual reminders are re-evaluated when the recognized asset has not changed.
+// They are time-window based, so hitting SQLite on every frame only costs the UI a re-render.
+export const AR_CONTEXT_ALERT_INTERVAL_MS = 5000;
+
 // Training
 // Maximum active memory assets in monthly training pool
 export const MAX_MONTHLY_POOL_SIZE = 45;

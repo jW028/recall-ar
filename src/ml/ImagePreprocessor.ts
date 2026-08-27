@@ -77,6 +77,14 @@ export async function prepareImageTensor(uri: string, spec: TensorSpec): Promise
         })
     );
 
+    // manipulateAsync writes the resized frame to the cache as well as returning base64, and nothing reads that file.
+    // The AR loop calls this a couple of times a second, so leaving them behind fills the cache over a session.
+    try {
+        new File(result.uri).delete();
+    } catch {
+        // Cache file; the OS reclaims it if the delete fails
+    }
+
     if (!result.base64) {
         throw new Error('[ImagePreprocessor] Failed to get base64 from resized image');
     }

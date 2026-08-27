@@ -36,7 +36,8 @@ function buildLabel(match: MatchResult): string {
         : asset.name;
     }
 
-    return asset.notes || asset.name;
+    // The overlay names what the patient is looking at; notes are the caregiver's description, not a label
+    return asset.name;
 }
 
 // Returns the shared category (from the best match) when two near-tied objects belong to the same category
@@ -151,6 +152,9 @@ function resolve(q: QueryResult, processingTimeMs: number): RecognitionResult | 
     };
 }
 
+// Stand-in for a type whose index is empty, so the frame never pays for that model
+const NO_QUERY_MATCH: QueryResult = { match: null, ambiguousWith: null, bestScore: -1, bestAssetId: null };
+
 // Recognition loop. Embeds the frame with both models and queries each type's index — a frame may contain either
 // a face or an object, and only the per-type thresholds can tell which.
 async function processFrame(frameUri: string): Promise<RecognitionResult> {
@@ -160,13 +164,26 @@ async function processFrame(frameUri: string): Promise<RecognitionResult> {
       return { status: 'scanning', processingTimeMs: performance.now() - startTime };
     }
 
+    // Preparing a tensor costs a native resize plus a JS-thread PNG decode, and inference blocks the JS thread too
+    // Skipping the model whose index is empty halves that per-frame cost for a patient with only one asset type
+    const hasFaces = VectorStore.getIndexSize('Person') > 0;
+    const hasObjects = VectorStore.getIndexSize('Object') > 0;
+
+    if (!hasFaces && !hasObjects) {
+      return { status: 'scanning', processingTimeMs: performance.now() - startTime };
+    }
+
     const [faceTensor, objectTensor] = await Promise.all([
-      prepareImageTensor(frameUri, FACE_TENSOR),
-      prepareImageTensor(frameUri, OBJECT_LIVE_TENSOR),
+      hasFaces ? prepareImageTensor(frameUri, FACE_TENSOR) : null,
+      hasObjects ? prepareImageTensor(frameUri, OBJECT_LIVE_TENSOR) : null,
     ]);
 
-    const faceQuery = VectorStore.query(FaceEmbeddingModel.runInference(faceTensor), 'Person');
-    const objectQuery = VectorStore.query(ObjectEmbeddingModel.runInference(objectTensor), 'Object');
+    const faceQuery = faceTensor
+      ? VectorStore.query(FaceEmbeddingModel.runInference(faceTensor), 'Person')
+      : NO_QUERY_MATCH;
+    const objectQuery = objectTensor
+      ? VectorStore.query(ObjectEmbeddingModel.runInference(objectTensor), 'Object')
+      : NO_QUERY_MATCH;
 
     const processingTimeMs = performance.now() - startTime;
 
