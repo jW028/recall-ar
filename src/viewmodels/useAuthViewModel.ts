@@ -30,17 +30,22 @@ export function useAuthViewModel(): UseAuthViewModel {
             setIsSubmitting(true);
             setError(null);
 
-            const result = await AuthService.signIn(params);
+            try {
+                const result = await AuthService.signIn(params);
 
-            if (result.error) {
-                setError(result.error);
+                if (result.error) {
+                    setError(result.error);
+                    return;
+                }
+
+                setUser(result.data);
+                router.replace('/(caregiver)/home');
+            } catch (e) {
+                // Without this the submit button would stay stuck on its spinner with nothing on screen explaining why.
+                setError(e instanceof Error ? e.message : 'Sign in failed. Please try again.');
+            } finally {
                 setIsSubmitting(false);
-                return;
             }
-
-            setUser(result.data);
-            setIsSubmitting(false);
-            router.replace('/(caregiver)/home');
         },
         [router, setUser]
     );
@@ -50,35 +55,41 @@ export function useAuthViewModel(): UseAuthViewModel {
             setIsSubmitting(true);
             setError(null);
 
-            const result = await AuthService.signUp(params);
+            try {
+                const result = await AuthService.signUp(params);
 
-            if (result.error) {
-                setError(result.error);
+                if (result.error) {
+                    setError(result.error);
+                    return;
+                }
+
+                if (!result.data) {
+                    // Email confirmation is enabled — account created but session
+                    // won't exist until the user clicks the confirmation link.
+                    setConfirmationPending(true);
+                    return;
+                }
+
+                setUser(result.data);
+                router.replace('/(caregiver)/home');
+            } catch (e) {
+                setError(e instanceof Error ? e.message : 'Registration failed. Please try again.');
+            } finally {
                 setIsSubmitting(false);
-                return;
             }
-
-            if (!result.data) {
-                // Email confirmation is enabled — account created but session
-                // won't exist until the user clicks the confirmation link.
-                setConfirmationPending(true);
-                setIsSubmitting(false);
-                return;
-            }
-
-            setUser(result.data);
-            setIsSubmitting(false);
-            router.replace('/(caregiver)/home');
         },
         [router, setUser]
     );
 
     const logout = useCallback(async () => {
         setIsSubmitting(true);
-        await AuthService.signOut();
-        setUser(null);
-        setIsSubmitting(false);
-        router.replace('/login');
+        try {
+            await AuthService.signOut();
+        } finally {
+            setUser(null);
+            setIsSubmitting(false);
+            router.replace('/login');
+        }
     }, [router, setUser]);
 
     const clearError = useCallback(() => setError(null), []);

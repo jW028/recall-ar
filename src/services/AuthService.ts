@@ -242,16 +242,21 @@ async function getSessionIdentity(): Promise<{ id: string; role: UserRole } | nu
 function onAuthStateChange(
     callback: (user: AuthUser | null) => void
 ): () => void {
-    const { data: listener } = supabase.auth.onAuthStateChange(
-        async (_event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+        // signInWithPassword awaits every listener before it resolves, so resolving the profile inline stalls sign-in and any throw here rejects it.
+        setTimeout(async () => {
             if (!session?.user) {
                 callback(null);
                 return;
             }
-            const authUser = await resolveAuthUser(session.user);
-            callback(authUser);
-        }
-    );
+            try {
+                callback(await resolveAuthUser(session.user));
+            } catch (e) {
+                // A transient profile lookup failure must not sign the user out, so leave the current user in place.
+                console.error('[Auth] Failed to resolve user on auth state change:', e);
+            }
+        }, 0);
+    });
 
     return () => listener.subscription.unsubscribe();
 }

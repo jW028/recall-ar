@@ -34,6 +34,12 @@ interface SyncTableConfig<TLocalRow = any, TSupabaseRow = any> {
     primaryKey: string;
     remotePrimaryKey?: string;
 
+    // Conflict target for the push upsert, when the remote row's identity is a natural key rather than its primary key. Defaults to the remote primary key.
+    upsertConflictTarget?: string;
+
+    // Resolves a push conflict as DO NOTHING instead of DO UPDATE. For append-only tables where the remote copy of a natural key is already the truth and must not be rewritten.
+    ignoreDuplicates?: boolean;
+
     readLocalRow: (rowId: string) => Promise<TLocalRow | null>;
 
     toSupabaseRow: (localRow: TLocalRow) => TSupabaseRow;
@@ -250,9 +256,12 @@ export const syncTableConfig: Record<SyncableTable, SyncTableConfig> = {
         }),
     },
 
+    // Append-only, one row per (patient, asset, local day). Supabase enforces that triple with its own UNIQUE constraint, and recognition_id is minted per device, so a reinstalled or second device pushes a fresh id for a day another device already logged. Upserting on the natural key with DO NOTHING keeps that a no-op instead of a permanent 23505 that leaves the row queued forever.
     RecognitionEvent: {
         supabaseTable: 'RecognitionEvent',
         primaryKey: 'recognition_id',
+        upsertConflictTarget: 'patient_id,asset_id,event_date',
+        ignoreDuplicates: true,
         readLocalRow: readByPrimaryKey('RecognitionEvent', 'recognition_id'),
         toSupabaseRow: (row) => ({
             recognition_id: row.recognition_id,

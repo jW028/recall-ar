@@ -1,7 +1,7 @@
 import { supabase } from '@/database/remote/supabaseClient';
 import { AuthService } from '@/services/AuthService';
 import { GeofenceService } from '@/services/GeofenceService';
-import { isOnline, isTransientNetworkError } from '@/utils/connectivity';
+import { isOnline, isRetryableSyncError } from '@/utils/connectivity';
 
 export interface PatientLocationData {
     latitude: number;
@@ -51,7 +51,7 @@ async function publishLocation(
     });
 
     if (error) {
-        if (!isTransientNetworkError(error.message)) {
+        if (!isRetryableSyncError(error.message)) {
             console.warn('[LocationService] Failed to publish location:', error.message);
         }
         return { data: null, error: error.message };

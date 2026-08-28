@@ -1,7 +1,7 @@
 import { getDatabase, isDatabaseReady } from '@/database/local/db';
 import { supabase } from '@/database/remote/supabaseClient';
 import { AuthService } from '@/services/AuthService';
-import { isOnline, isTransientNetworkError } from '@/utils/connectivity';
+import { isOnline, isRetryableSyncError } from '@/utils/connectivity';
 import { syncTableConfig, type SyncableTable } from './syncTableConfig';
 
 // Types
@@ -22,6 +22,8 @@ export interface SyncSummary {
 export interface PullSummary {
     pulled: number;
     skipped: number;
+    // Set when the pull failed for a reason the next cycle will retry unchanged, so the caller stops instead of repeating the same doomed request per table.
+    retryable?: boolean;
 }
 
 // Tables pulled from Supabase into local SQLite, in FK-safe order (a parent before anything that references it). Push-only tables are absent.
@@ -112,7 +114,7 @@ async function pushRow(row: SyncLogRow, authUserId: string): Promise<string | nu
                 .delete()
                 .eq(remotePk, row.row_id);
             if (error) {
-                if (!isTransientNetworkError(error.message)) {
+                if (!isRetryableSyncError(error.message)) {
                     console.error(`[SyncService] DELETE error on ${row.table_name} (as auth user ${authUserId}):`, error.message, error);
                 }
                 return error.message;
@@ -130,10 +132,13 @@ async function pushRow(row: SyncLogRow, authUserId: string): Promise<string | nu
         const supabaseRow = config.toSupabaseRow(localRow);
         const { error } = await supabase
             .from(config.supabaseTable)
-            .upsert(supabaseRow, { onConflict: remotePk });
+            .upsert(supabaseRow, {
+                onConflict: config.upsertConflictTarget ?? remotePk,
+                ignoreDuplicates: config.ignoreDuplicates ?? false,
+            });
 
         if (error) {
-            if (!isTransientNetworkError(error.message)) {
+            if (!isRetryableSyncError(error.message)) {
                 console.error(`[SyncService] UPSERT error on ${row.table_name} (${row.row_id}, as auth user ${authUserId}):`, error.message, error);
             }
             return error.message;
@@ -143,7 +148,7 @@ async function pushRow(row: SyncLogRow, authUserId: string): Promise<string | nu
         return null;
     } catch (e) {
         const msg = e instanceof Error ? e.message : 'Unknown sync error';
-        if (!isTransientNetworkError(msg)) {
+        if (!isRetryableSyncError(msg)) {
             console.error(`[SyncService] Exception pushing ${row.table_name}:`, msg, e);
         }
         return msg;
@@ -241,10 +246,11 @@ async function pullTable(
 
     // RLS filters a SELECT rather than rejecting it, so an unauthorised pull comes back as an empty list with no error — indistinguishable from "nothing new". Only a real error is worth reporting here; the caller guards the identity.
     if (error) {
-        if (!isTransientNetworkError(error.message)) {
+        const retryable = isRetryableSyncError(error.message);
+        if (!retryable) {
             console.error(`[SyncService] PULL error on ${table}:`, error.message, error);
         }
-        return { pulled: 0, skipped: 0 };
+        return { pulled: 0, skipped: 0, retryable };
     }
     if (!data) return { pulled: 0, skipped: 0 };
 
@@ -330,7 +336,7 @@ async function drainQueue(): Promise<SyncSummary> {
             failed++;
 
             // The connection dropped mid-cycle. Every remaining row would fail identically, so stop rather than firing one more doomed request per queued change; they stay pending for the next cycle.
-            if (isTransientNetworkError(errorMessage)) {
+            if (isRetryableSyncError(errorMessage)) {
                 hitTransient = true;
                 reportPaused(pendingRows.length - succeeded);
                 break;
@@ -366,6 +372,8 @@ async function pullAll(patientId: string): Promise<PullSummary> {
         const summary = await pullTable(table, { column: scopeColumn, value: patientId });
         pulled += summary.pulled;
         skipped += summary.skipped;
+        // The connection or the token failed the whole cycle, not this table. Every remaining table would fail identically, and no watermark has advanced, so the next cycle picks up where this one stopped.
+        if (summary.retryable) return { pulled, skipped, retryable: true };
     }
     return { pulled, skipped };
 }
@@ -389,6 +397,8 @@ async function pullAllForCaregiver(caregiverId: string): Promise<PullSummary> {
     let pulled = patientSummary.pulled;
     let skipped = patientSummary.skipped;
 
+    if (patientSummary.retryable) return { pulled, skipped, retryable: true };
+
     const db = getDatabase();
     const patients = await db.getAllAsync<{ patient_id: string }>(
         `SELECT patient_id FROM Patient WHERE caregiver_id = ?`,
@@ -402,6 +412,8 @@ async function pullAllForCaregiver(caregiverId: string): Promise<PullSummary> {
             const summary = await pullTable(table, { column: scopeColumn, value: patient_id });
             pulled += summary.pulled;
             skipped += summary.skipped;
+            // Same reasoning as pullAll — a whole-cycle failure stops here rather than repeating per table and per patient.
+            if (summary.retryable) return { pulled, skipped, retryable: true };
         }
     }
 
