@@ -106,16 +106,3 @@ Local tables: `Caregiver`, `Patient`, `MemoryAsset`, `TrainingSession`, `DailyRe
 `CognitiveReport`, `Geofence`, `GeofenceEvent`, `Threat`, `ContextAlert`, `SyncLog`. Schema changes
 go in `src/database/local/migrations/` as a new `vN_*.ts` **and** in `supabase/migrations/` — never
 by editing `CREATE_TABLES` in `schema.ts`.
-
-## Design docs
-
-Read these before touching the corresponding area; they override the original spec where they
-disagree with it.
-
-| Doc | Covers |
-|---|---|
-| [`SDD.md`](SDD.md) | System design and the full use-case set |
-| [`TRAINING_FLOW.md`](TRAINING_FLOW.md) | Spaced Retrieval scheduling — elapsed-time, not session timers |
-| [`ANALYTICS.md`](ANALYTICS.md) | Biomarkers, smoothing, trend slopes, the degradation flag |
-| [`PULL_SYNC.md`](PULL_SYNC.md) | Sync direction and conflict handling |
-| [`TESTING.md`](TESTING.md) | Manual test plans and results |
